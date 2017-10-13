@@ -88,43 +88,6 @@ def cnn_word_model(text_size, embedding_size, filters_cnn, kernel_sizes):
     return model
 
 
-def attention_3d_block(inputs):
-    # inputs.shape = (batch_size, time_steps, input_dim)
-    input_dim = int(inputs.shape[2])
-    a = Permute((2, 1))(inputs)
-    a = Reshape((input_dim, text_size))(a)
-    a = Dense(text_size, activation='relu')(a)
-    a = Dense(text_size, activation='relu')(a)
-    a = Dense(text_size, activation='relu')(a)
-    a = Dense(text_size, activation='softmax')(a)
-
-    a_probs = Permute((2, 1))(a)
-    output_attention_mul = Multiply()([inputs, a_probs])
-    return output_attention_mul
-
-
-def lstm_word_model(text_size, embedding_size, units_lstm):
-    embed_input = Input(shape=(text_size, embedding_size))
-    output = Bidirectional(LSTM(units_lstm, activation='tanh',
-                                kernel_regularizer=l2(0.0001),
-                                return_sequences=True,
-                                dropout=0.5))(embed_input)
-    output = attention_3d_block(output)
-    output = Flatten()(output)
-    output = Dropout(rate=0.5)(output)
-    output = Dense(100, activation=None,
-                   kernel_regularizer=l2(0.001))(output)
-    output = BatchNormalization()(output)
-    output = Activation('relu')(output)
-    output = Dropout(rate=0.5)(output)
-    output = Dense(7, activation=None,
-                   kernel_regularizer=l2(0.001))(output)
-    output = BatchNormalization()(output)
-    act_output = Activation('sigmoid')(output)
-    model = Model(inputs=embed_input, outputs=act_output)
-    return model
-
-
 fasttext_model_file = '../data_preprocessing/reddit_fasttext_model.bin'
 fasttext_model = fasttext.load_model(fasttext_model_file)
 
