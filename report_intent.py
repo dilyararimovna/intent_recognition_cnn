@@ -19,7 +19,11 @@ def report(train_true, train_preds, test_true, test_preds, intents):
 	print('TEST:')
 	print("     type \t precision \t recall \t f1-score \t support")
 
+	f1_scores = []
+
 	for ind, intent in enumerate(intents):
 	    scores = np.asarray(precision_recall_fscore_support(test_true[:, ind], test_preds[:, ind]))[:, 1]
 	    print("%s \t %f \t %f \t %f \t %f" % (intent, scores[0], scores[1], scores[2], scores[3]))
+	    f1_scores.append(scores[2])
 
+	return(f1_scores)
