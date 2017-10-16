@@ -17,6 +17,7 @@ from keras.optimizers import Adam, SGD
 from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 import json
 from keras import backend as K
+import fasttext
 
 from metrics import fmeasure
 from fasttext_embeddings import text2embeddings
