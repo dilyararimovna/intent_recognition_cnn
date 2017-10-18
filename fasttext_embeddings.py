@@ -1,11 +1,15 @@
 import fasttext
 import numpy as np
+import re
+
+def split_string(s):
+    return re.findall(r"[\w']+|[‑–—“”€№…’\"#$%&\'()+,-./:;<>?]", s)
 
 def text2embeddings(texts, fasttext_model, text_size, embedding_size):
     all_embeddings = []
     for text in texts:
         embeddings = []  # embedded text
-        tokens = text.split(' ')
+        tokens = split_string(text)
         if len(tokens) > text_size:
             tokens = tokens[-text_size:]
         for token in tokens:

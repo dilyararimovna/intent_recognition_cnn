@@ -39,7 +39,7 @@ fasttext_model = fasttext.load_model(fasttext_model_file)
 text_size = 25
 embedding_size = 100
 n_splits = 5
-filters = [128, 128, 128, 128, 128, 128, 128]
+filters = [64, 64, 64, 128, 128, 256, 256]
 kernel_sizes = [1,2,3]
 coef_reg_cnn = 0.0001
 coef_reg_den = 0.001
@@ -48,7 +48,7 @@ dropout_rate = 0.5
 lear_rate = 0.1
 lear_rate_decay = 0.1
 batch_sizes = [8, 8, 8, 16, 32, 32, 32]
-epochs = 50
+epochs = 1000
 train_sizes = [10, 25, 50, 100, 200, 500, 1000] # per intent
 
 intents = ['AddToPlaylist', 'BookRestaurant', 'GetWeather', 
