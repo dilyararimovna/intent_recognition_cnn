@@ -44,15 +44,15 @@ tf.set_random_seed(SEED)
 
 train_data = []
 
-train_data.append(pd.read_csv("./intent_data/snips_ner_0/snips_train_0.csv"))
-train_data.append(pd.read_csv("./intent_data/snips_ner_0/snips_train_1.csv"))
-train_data.append(pd.read_csv("./intent_data/snips_ner_0/snips_train_2.csv"))
+train_data.append(pd.read_csv("./intent_data/snips_ner_gold/snips_ner_gold_0/snips_train_0"))
+train_data.append(pd.read_csv("./intent_data/snips_ner_gold/snips_ner_gold_0/snips_train_1"))
+train_data.append(pd.read_csv("./intent_data/snips_ner_gold/snips_ner_gold_0/snips_train_2"))
 
 test_data = []
 
-test_data.append(pd.read_csv("./intent_data/snips_ner_0/snips_test_0.csv"))
-test_data.append(pd.read_csv("./intent_data/snips_ner_0/snips_test_1.csv"))
-test_data.append(pd.read_csv("./intent_data/snips_ner_0/snips_test_2.csv"))
+test_data.append(pd.read_csv("./intent_data/snips_ner_gold/snips_ner_gold_0/snips_test_0"))
+test_data.append(pd.read_csv("./intent_data/snips_ner_gold/snips_ner_gold_0/snips_test_1"))
+test_data.append(pd.read_csv("./intent_data/snips_ner_gold/snips_ner_gold_0/snips_test_2"))
 
 fasttext_model_file = '../data_preprocessing/reddit_fasttext_model.bin'
 fasttext_model = fasttext.load_model(fasttext_model_file)
@@ -178,8 +178,8 @@ for k in range(16):
 	                        validation_split=0.1,
 	                        verbose=0, shuffle=True,
 	                        callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0),
-	                                   #ModelCheckpoint(filepath="./keras_checkpoints/snips_" + str(n_splits)),
-	                                   #TensorBoard(log_dir='./keras_logs/keras_log_files_' + str(ind))
+	                                   #ModelCheckpoint(filepath="./keras_checkpoints/truth_ner_snips_" + str(n_splits)),
+	                                   #TensorBoard(log_dir='./keras_logs/truth_ner_keras_log_files_' + str(ind))
 	                                   ])
 
 	    y_train_pred = model.predict(X_train_embed).reshape(-1, 7)
@@ -188,7 +188,7 @@ for k in range(16):
 	    y_test_pred = model.predict(X_test_embed).reshape(-1, 7)
 	    test_preds.extend(y_test_pred)
 	    test_true.extend(y_test)
-	    save(model, fname='./snips_ner_models/model_' + str(ind))
+	    save(model, fname='./snips_ner_models/truth_model_' + str(ind))
     train_preds = np.asarray(train_preds)
     train_true = np.asarray(train_true)
     test_preds = np.asarray(test_preds)
@@ -197,10 +197,11 @@ for k in range(16):
     # if np.mean(f1_scores) > best_mean_f1:
     #     best_network_params = network_params
     #     best_learning_params = learning_params
-    #     save(model, fname='./snips_models/best_model_ner')
+    #     save(model, fname='./snips_models/best_model_ner_truth')
     #     print('BETTER PARAMETERS FOUND!\n')
     #     print('PARAMETERS:', best_network_params, best_learning_params)
     #     best_mean_f1 = np.mean(f1_scores)
+
     f1_scores_for_intents.append(f1_scores)
 
 f1_scores_for_intents = np.asarray(f1_scores_for_intents)

@@ -104,7 +104,7 @@ for train_index, test_index in kf_split.split(data['request'], stratif_y):
                             verbose=0,
                             callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.00),
                                        ModelCheckpoint(filepath="./keras_checkpoints_byparts/snips_" + str(n_splits)),
-                                       TensorBoard(log_dir='./keras_log_files_byparts_' + str(ind))
+                                       TensorBoard(log_dir='./keras_logs/keras_log_files_byparts_' + str(ind))
                                        ])
         ind += 1
         y_train_pred = model.predict(X_train_embed).reshape(-1, 7)

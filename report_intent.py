@@ -10,14 +10,14 @@ def report(train_true, train_preds, test_true, test_preds, intents):
 	test_preds = np.round(test_preds)
 
 	print('TRAIN: (with repeats)')
-	print("     type \t precision \t recall \t f1-score \t support")
+	print("     type     precision     recall     f1-score     support")
 
 	for ind, intent in enumerate(intents):
 	    scores = np.asarray(precision_recall_fscore_support(train_true[:, ind], train_preds[:, ind]))[:, 1]
 	    print("%s \t %f \t %f \t %f \t %f" % (intent, scores[0], scores[1], scores[2], scores[3]))
 
 	print('TEST:')
-	print("     type \t precision \t recall \t f1-score \t support")
+	print("     type     precision     recall     f1-score     support")
 
 	f1_scores = []
 
