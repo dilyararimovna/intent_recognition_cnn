@@ -103,7 +103,7 @@ for curr_tag in range(num_of_tags):
 
     f1_scores_for_intents = []
 
-    for iter_ in range(16):
+    for iter_ in range(1):
         network_params = param_gen(coef_reg_cnn={'range': [0.000571,0.000571], 'scale': 'log'},
                                    coef_reg_den={'range': [0.000377,0.000377], 'scale': 'log'},
                                    filters_cnn={'range': [220,220], 'discrete': True},
@@ -202,8 +202,8 @@ for curr_tag in range(num_of_tags):
         f1_mean = np.mean(f1_scores_for_intents[:,intent_id])
         f1_std = np.std(f1_scores_for_intents[:,intent_id])
         print("Intent: %s \t F1: %f +- %f" % (intents[intent_id], f1_mean, f1_std))
-        tags_acc_table.loc[curr_tag,intent+"_mean"] = f1_mean
-        tags_acc_table.loc[curr_tag,intent+"_std"] = f1_std
+        tags_acc_table.loc[curr_tag,intents[intent_id]+"_mean"] = f1_mean
+        tags_acc_table.loc[curr_tag,intents[intent_id]+"_std"] = f1_std
 
 
 tags_acc_table.to_csv('./tags_intent_f1scores.csv', index=False)

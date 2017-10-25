@@ -110,17 +110,17 @@ best_learning_params = dict()
 
 f1_scores_for_intents = []
 
-for k in range(16):
-    network_params = param_gen(coef_reg_cnn={'range': [0.00238,0.00238], 'scale': 'log'},
-                               coef_reg_den={'range': [0.000122,0.000122], 'scale': 'log'},
-                               filters_cnn={'range': [290, 290], 'discrete': True},
-                               dense_size={'range': [182,182], 'discrete': True},
-                               dropout_rate={'range': [0.5145, 0.5145]})
+while 1:
+    network_params = param_gen(coef_reg_cnn={'range': [0.001,0.003], 'scale': 'log'},
+                               coef_reg_den={'range': [0.0001,0.0002], 'scale': 'log'},
+                               filters_cnn={'range': [200, 300], 'discrete': True},
+                               dense_size={'range': [100,200], 'discrete': True},
+                               dropout_rate={'range': [0.45, 0.55]})
 
-    learning_params = param_gen(batch_size={'range': [18,18], 'discrete': True},
-                                lear_rate={'range': [0.036642,0.036642], 'scale': 'log'},
-                                lear_rate_decay={'range': [0.063233,0.063233], 'scale': 'log'},
-                                epochs={'range': [13,13], 'discrete': True, 'scale': 'log'})
+    learning_params = param_gen(batch_size={'range': [16,64], 'discrete': True},
+                                lear_rate={'range': [0.01,0.1], 'scale': 'log'},
+                                lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
+                                epochs={'range': [10,50], 'discrete': True, 'scale': 'log'})
 
     print('\n\nCONSIDERED PARAMETERS: ', network_params)
     print('\n\nCONSIDERED PARAMETERS: ', learning_params)
@@ -194,19 +194,20 @@ for k in range(16):
     test_preds = np.asarray(test_preds)
     test_true = np.asarray(test_true)
     f1_scores = report(train_true, train_preds, test_true, test_preds, intents)
-    # if np.mean(f1_scores) > best_mean_f1:
-    #     best_network_params = network_params
-    #     best_learning_params = learning_params
-    #     save(model, fname='./snips_models/best_model_ner_truth')
-    #     print('BETTER PARAMETERS FOUND!\n')
-    #     print('PARAMETERS:', best_network_params, best_learning_params)
-    #     best_mean_f1 = np.mean(f1_scores)
+    if np.mean(f1_scores) > best_mean_f1:
+        best_network_params = network_params
+        best_learning_params = learning_params
+        save(model, fname='./snips_models/best_model_ner_truth')
+        print('BETTER PARAMETERS FOUND!\n')
+        print('PARAMETERS:', best_network_params, best_learning_params)
+        best_mean_f1 = np.mean(f1_scores)
 
-    f1_scores_for_intents.append(f1_scores)
 
-f1_scores_for_intents = np.asarray(f1_scores_for_intents)
-for intent_id in range(len(intents)):
-    f1_mean = np.mean(f1_scores_for_intents[:,intent_id])
-    f1_std = np.std(f1_scores_for_intents[:,intent_id])
-    print("Intent: %s \t F1: %f +- %f" % (intents[intent_id], f1_mean, f1_std))
+#     f1_scores_for_intents.append(f1_scores)
+
+# f1_scores_for_intents = np.asarray(f1_scores_for_intents)
+# for intent_id in range(len(intents)):
+#     f1_mean = np.mean(f1_scores_for_intents[:,intent_id])
+#     f1_std = np.std(f1_scores_for_intents[:,intent_id])
+#     print("Intent: %s \t F1: %f +- %f" % (intents[intent_id], f1_mean, f1_std))
 

@@ -30,7 +30,7 @@ import fasttext
 
 from metrics import fmeasure
 from fasttext_embeddings import text2embeddings
-from intent_models import cnn_word_model
+from intent_models import cnn_word_model_ner
 from report_intent import report
 
 import sys
@@ -110,17 +110,19 @@ best_learning_params = dict()
 
 f1_scores_for_intents = []
 
-for k in range(16):
-    network_params = param_gen(coef_reg_cnn={'range': [0.0010580597184848162,0.0010580597184848162], 'scale': 'log'},
-                               coef_reg_den={'range': [0.00014086232039855904,0.00014086232039855904], 'scale': 'log'},
-                               filters_cnn={'range': [227, 227], 'discrete': True},
-                               dense_size={'range': [188,188], 'discrete': True},
-                               dropout_rate={'range': [0.46127929403175694, 0.46127929403175694]})
+while 1:
+    network_params = param_gen(coef_reg_cnn_emb={'range': [0.001,0.01], 'scale': 'log'},
+    	                       coef_reg_cnn_tag={'range': [0.0001,0.001], 'scale': 'log'},
+                               coef_reg_den={'range': [0.0001,0.001], 'scale': 'log'},
+                               filters_cnn_emb={'range': [200,300], 'discrete': True},
+                               filters_cnn_tag={'range': [100, 200], 'discrete': True},
+                               dense_size={'range': [100,200], 'discrete': True},
+                               dropout_rate={'range': [0.45, 0.55]})
 
-    learning_params = param_gen(batch_size={'range': [53,53], 'discrete': True},
-                                lear_rate={'range': [0.012843477909465273,0.012843477909465273], 'scale': 'log'},
-                                lear_rate_decay={'range': [0.017379662728958811,0.017379662728958811], 'scale': 'log'},
-                                epochs={'range': [16,16], 'discrete': True, 'scale': 'log'})
+    learning_params = param_gen(batch_size={'range': [16,64], 'discrete': True},
+                                lear_rate={'range': [0.01,0.1], 'scale': 'log'},
+                                lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
+                                epochs={'range': [10,50], 'discrete': True, 'scale': 'log'})
 
     print('\n\nCONSIDERED PARAMETERS: ', network_params)
     print('\n\nCONSIDERED PARAMETERS: ', learning_params)
@@ -149,7 +151,7 @@ for k in range(16):
 	    train_tags_table = keras.preprocessing.sequence.pad_sequences(train_tags_table, maxlen=text_size, 
 	                                                                  padding='pre')
 
-	    X_train_embed = np.dstack((X_train_embed, train_tags_table))
+	    #X_train_embed = np.dstack((X_train_embed, train_tags_table))
 
 	    test_tags_table = []
 	    for k in range(test_data[ind].shape[0]):
@@ -162,17 +164,21 @@ for k in range(16):
 	    test_tags_table = keras.preprocessing.sequence.pad_sequences(test_tags_table, maxlen=text_size, 
 	                                                                 padding='pre')
 
-	    X_test_embed = np.dstack((X_test_embed, test_tags_table))
+	    #X_test_embed = np.dstack((X_test_embed, test_tags_table))
 
-	    model = cnn_word_model(text_size, embedding_size=embedding_size+num_of_tags, kernel_sizes=kernel_sizes, 
-	    	                   **network_params)
+	    model = init_from_scratch(cnn_word_model_ner, text_size=text_size, tag_size=num_of_tags, 
+	    	                      embedding_size=embedding_size, kernel_sizes=kernel_sizes, **network_params)
+        #model = init_from_saved(cnn_word_model_ner, fname='', text_size=text_size, 
+        #                        embedding_size=embedding_size+num_of_tags, 
+        #                        kernel_sizes=kernel_sizes, **network_params)
+
 
 	    optimizer = Adam(lr=learning_params['lear_rate'], decay=learning_params['lear_rate_decay'])
 	    model.compile(loss='categorical_crossentropy',
 	                  optimizer=optimizer,
 	                  metrics=['categorical_accuracy',
 	                           fmeasure])
-	    history = model.fit(X_train_embed, y_train.reshape(-1, 7),
+	    history = model.fit([X_train_embed, train_tags_table], y_train.reshape(-1, 7),
 	                        batch_size=learning_params['batch_size'],
 	                        epochs=learning_params['epochs'],
 	                        validation_split=0.1,
@@ -182,10 +188,10 @@ for k in range(16):
 	                                   #TensorBoard(log_dir='./keras_logs/keras_log_files_' + str(ind))
 	                                   ])
 
-	    y_train_pred = model.predict(X_train_embed).reshape(-1, 7)
+	    y_train_pred = model.predict([X_train_embed, train_tags_table]).reshape(-1, 7)
 	    train_preds.extend(y_train_pred)
 	    train_true.extend(y_train)
-	    y_test_pred = model.predict(X_test_embed).reshape(-1, 7)
+	    y_test_pred = model.predict([X_test_embed, test_tags_table]).reshape(-1, 7)
 	    test_preds.extend(y_test_pred)
 	    test_true.extend(y_test)
 	    save(model, fname='./snips_ner_models/model_' + str(ind))
@@ -194,18 +200,18 @@ for k in range(16):
     test_preds = np.asarray(test_preds)
     test_true = np.asarray(test_true)
     f1_scores = report(train_true, train_preds, test_true, test_preds, intents)
-    # if np.mean(f1_scores) > best_mean_f1:
-    #     best_network_params = network_params
-    #     best_learning_params = learning_params
-    #     save(model, fname='./snips_models/best_model_ner')
-    #     print('BETTER PARAMETERS FOUND!\n')
-    #     print('PARAMETERS:', best_network_params, best_learning_params)
-    #     best_mean_f1 = np.mean(f1_scores)
-    f1_scores_for_intents.append(f1_scores)
+    if np.mean(f1_scores) > best_mean_f1:
+        best_network_params = network_params
+        best_learning_params = learning_params
+        save(model, fname='./snips_models/best_model_ner')
+        print('BETTER PARAMETERS FOUND!\n')
+        print('PARAMETERS:', best_network_params, best_learning_params)
+        best_mean_f1 = np.mean(f1_scores)
+#     f1_scores_for_intents.append(f1_scores)
 
-f1_scores_for_intents = np.asarray(f1_scores_for_intents)
-for intent_id in range(len(intents)):
-    f1_mean = np.mean(f1_scores_for_intents[:,intent_id])
-    f1_std = np.std(f1_scores_for_intents[:,intent_id])
-    print("Intent: %s \t F1: %f +- %f" % (intents[intent_id], f1_mean, f1_std))
+# f1_scores_for_intents = np.asarray(f1_scores_for_intents)
+# for intent_id in range(len(intents)):
+#     f1_mean = np.mean(f1_scores_for_intents[:,intent_id])
+#     f1_std = np.std(f1_scores_for_intents[:,intent_id])
+#     print("Intent: %s \t F1: %f +- %f" % (intents[intent_id], f1_mean, f1_std))
 
