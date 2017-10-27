@@ -27,3 +27,4 @@ def report(train_true, train_preds, test_true, test_preds, intents):
 	    f1_scores.append(scores[2])
 
 	return(f1_scores)
+

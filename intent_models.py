@@ -37,7 +37,7 @@ def cnn_word_model(text_size, embedding_size, filters_cnn,
     output = Dropout(rate=dropout_rate)(output)
     output = Dense(7, activation=None, kernel_regularizer=l2(coef_reg_den))(output)
     output = BatchNormalization()(output)
-    act_output = Activation('sigmoid')(output)
+    act_output = Activation('softmax')(output)
     model = Model(inputs=inp, outputs=act_output)
     return model
 
@@ -81,8 +81,48 @@ def cnn_word_model_ner(text_size, tag_size, embedding_size, filters_cnn_emb, fil
     output = Dropout(rate=dropout_rate)(output)
     output = Dense(7, activation=None, kernel_regularizer=l2(coef_reg_den))(output)
     output = BatchNormalization()(output)
-    act_output = Activation('sigmoid')(output)
+    act_output = Activation('softmax')(output)
     model = Model(inputs=[inp_emb, inp_tag], outputs=act_output)
+    return model
+
+
+def cnn_word_model_with_sent_emb(text_size, embedding_size, sent_embedding_size, filters_cnn,
+	                             kernel_sizes, coef_reg_cnn, coef_reg_den, dropout_rate, dense_size):
+    inp = Input(shape=(text_size, embedding_size))
+    sent_emb = Input(shape=(sent_embedding_size,))
+
+    #sent_emb_resh = Reshape(target_shape=(1,sent_embedding_size))(sent_emb)
+
+    outputs = []
+    for i in range(len(kernel_sizes)):
+        output_i = Conv1D(filters_cnn, kernel_size=kernel_sizes[i], activation=None,
+                          kernel_regularizer=l2(coef_reg_cnn), padding='same')(inp)
+        output_i = BatchNormalization()(output_i)
+        output_i = Activation('relu')(output_i)
+        output_i = GlobalMaxPooling1D()(output_i)
+        outputs.append(output_i)
+
+    output = concatenate(outputs, axis=1)
+    print('Concatenate shape:', output.shape)
+    output = concatenate([output, sent_emb], axis=1)
+    print('Concatenate with sent emb shape:', output.shape)
+
+    output = Dropout(rate=dropout_rate)(output)
+    output = Dense(dense_size, activation=None,
+                   kernel_regularizer=l2(coef_reg_den))(output)
+    output = BatchNormalization()(output)
+    output = Activation('relu')(output)
+
+    output = Dropout(rate=dropout_rate)(output)
+    output = Dense(dense_size, activation=None,
+                   kernel_regularizer=l2(coef_reg_den))(output)
+    output = BatchNormalization()(output)
+    output = Activation('relu')(output)
+    output = Dropout(rate=dropout_rate)(output)
+    output = Dense(7, activation=None, kernel_regularizer=l2(coef_reg_den))(output)
+    output = BatchNormalization()(output)
+    act_output = Activation('sigmoid')(output)
+    model = Model(inputs=[inp, sent_emb], outputs=act_output)
     return model
 
 def cnn_word_model_glove(text_size, embedding_size, filters_cnn, 
