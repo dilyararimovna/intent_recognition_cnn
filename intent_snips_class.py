@@ -27,6 +27,8 @@ tf.set_random_seed(SEED)
 
 FIND_BEST_PARAMS = True
 AVERAGE_FOR_PARAMS = False
+NUM_OF_CALCS = 16
+VERSION = 0
 
 train_data = []
 
@@ -68,6 +70,8 @@ if FIND_BEST_PARAMS:
     best_mean_f1 = 0.
     best_network_params = dict()
     best_learning_params = dict()
+    params_f1 = []
+
     while 1:
         FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
                                                     coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
@@ -93,16 +97,68 @@ if FIND_BEST_PARAMS:
                                             mode='TEST')
         mean_f1 = np.mean(f1_test)
 
-        params_f1 = dict()
-        params_f1.extend(FindBestRecognizer.network_parameters)
-        params_f1.extend(FindBestRecognizer.learning_parameters)
-        params_f1.extend(mean_f1)
 
+        params_dict = FindBestRecognizer.all_params_to_dict()
+        params_dict['mean_f1'] = mean_f1
+        params_f1.append(params_dict)
+        print(params_f1)
+        params_f1_dataframe = pd.DataFrame(params_f1)
+        params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + str(VERSION) + '.txt')
 
-
-
-
+        if mean_f1 > best_mean_f1:
+            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + str(VERSION))
+            print('___BETTER PARAMETERS FOUND!___\n')
+            print('___THESE PARAMETERS ARE:___', params_dict)
+            best_mean_f1 = mean_f1
 
 
 if AVERAGE_FOR_PARAMS:
     print("___TO CALCULATE AVERAGE ACCURACY FOR PARAMETERS____")
+    train_requests = [train_data[i].loc[:, 'request'].values for i in range(3)]
+    train_classes = [train_data[i].loc[:, intents].values for i in range(3)]
+    test_requests = [test_data[i].loc[:, 'request'].values for i in range(3)]
+    test_classes = [test_data[i].loc[:, intents].values for i in range(3)]
+
+    AverageRecognizer = IntentRecognizer(intents, train_requests, train_classes, cnn_word_model,
+                                          fasttext_embedding_model=fasttext_model,
+                                          to_use_kfold=False, n_splits=None)
+    f1_scores_for_intents = []
+
+    for p in range(NUM_OF_CALCS):
+        AverageRecognizer.init_network_parameters([coef_reg_cnn = 0.0001, coef_reg_den = 0.0001,
+                                                   filters_cnn = 200, dense_size = 50, dropout_rate = 0.4],
+                                                  [coef_reg_cnn = 0.0001, coef_reg_den = 0.0001,
+                                                   filters_cnn = 200, dense_size = 50, dropout_rate = 0.4],
+                                                  [coef_reg_cnn = 0.0001, coef_reg_den = 0.0001,
+                                                   filters_cnn = 200, dense_size = 50, dropout_rate = 0.4])
+        AverageRecognizer.init_learning_parameters([batch_size=16,
+                                                   lear_rate=0.01,
+                                                   lear_rate_decay=0.01,
+                                                   epochs=20)
+        AverageRecognizer.fit_model(text_size, embedding_size, kernel_sizes, verbose=True)
+
+        train_predictions = AverageRecognizer.predict(train_requests)
+        AverageRecognizer.report(np.vstack([train_classes[i] for i in range(3)]),
+                                  np.vstack([train_predictions[i] for i in range(3)]),
+                                  mode='TRAIN')
+
+        test_predictions = AverageRecognizer.predict(test_requests)
+
+        f1_test = AverageRecognizer.report(np.vstack([test_classes[i] for i in range(3)]),
+                                            np.vstack([test_predictions[i] for i in range(3)]),
+                                            mode='TEST')
+        mean_f1 = np.mean(f1_test)
+
+        params_dict = AverageRecognizer.all_params_to_dict()
+        params_dict['mean_f1'] = mean_f1
+        params_f1.append(params_dict)
+        print(params_f1)
+        params_f1_dataframe = pd.DataFrame(params_f1)
+        params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + str(VERSION) + '.txt')
+
+        if mean_f1 > best_mean_f1:
+            AverageRecognizer.save_models(
+                fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + str(VERSION))
+            print('___BETTER PARAMETERS FOUND!___\n')
+            print('___THESE PARAMETERS ARE:___', params_dict)
+            best_mean_f1 = mean_f1

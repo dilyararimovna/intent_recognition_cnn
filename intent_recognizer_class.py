@@ -129,11 +129,13 @@ class IntentRecognizer(object):
                                            optimizer=optimizer,
                                            metrics=['categorical_accuracy',
                                            fmeasure])
-            self.histories.append(self.models[model_ind].fit(X_train_embed, self.y_train[model_ind].reshape(-1, 7),
+            permut = np.random.permutation(np.arange(X_train_embed.shape[0]))
+            self.histories.append(self.models[model_ind].fit(X_train_embed[permut], self.y_train[model_ind][permut].reshape(-1, 7),
                                                             batch_size=self.learning_parameters[model_ind]['batch_size'],
                                                             epochs=self.learning_parameters[model_ind]['epochs'],
                                                             validation_split=0.1,
                                                             verbose=2 * verbose,
+                                                            shuffle = False,
                                                             callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
         return True
 
@@ -161,10 +163,25 @@ class IntentRecognizer(object):
         print("%s \t %s \t%s \t %s \t %s" % ('type', 'precision', 'recall', 'f1-score', 'support'))
         f1_scores = []
         for ind, intent in enumerate(self.intents):
-            scores = np.asarray(precision_recall_fscore_support(true[:, ind], predicts[:, ind]))[:, 1]
+            scores = np.asarray(precision_recall_fscore_support(true[:, ind], np.round(predicts[:, ind])))[:, 1]
             print("%s \t %f \t %f \t %f \t %f" % (intent, scores[0], scores[1], scores[2], scores[3]))
             f1_scores.append(scores[2])
         return(f1_scores)
+
+    def all_params_to_dict(self):
+        for i in range(self.n_splits):
+            params_dict = dict()
+            for key in self.network_parameters[i].keys:
+                params_dict[key + '_' + str(i)] = self.network_parameters[i][key]
+            for key in self.learning_parameters[i].keys:
+                params_dict[key + '_' + str(i)] = self.learning_parameters[i][key]
+        return params_dict
+
+    def save_models(self, fname):
+        for model_ind in range(self.n_splits):
+            save(self.models[model_ind],
+                 fname=fname + '_' + str(model_ind))
+        return True
 
 
 
