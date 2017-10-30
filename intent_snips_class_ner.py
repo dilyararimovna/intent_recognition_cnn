@@ -10,15 +10,11 @@ import pandas as pd
 import numpy as np
 import fasttext
 
-from metrics import fmeasure
 from intent_models import cnn_word_model,cnn_word_model_ner
 from intent_recognizer_class import IntentRecognizer
 from keras.preprocessing.sequence import pad_sequences
 import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
-from random_search_class import param_gen
-from save_load_model import init_from_scratch, init_from_saved, save
-from save_predictions import save_predictions
 
 SEED = 23
 np.random.seed(SEED)
@@ -28,7 +24,7 @@ tf.set_random_seed(SEED)
 FIND_BEST_PARAMS = True
 AVERAGE_FOR_PARAMS = False
 NUM_OF_CALCS = 2
-VERSION = '_softmax_ner_average_0'
+VERSION = '_softmax_ner_findbest_0'
 
 train_data = []
 
@@ -120,7 +116,7 @@ if FIND_BEST_PARAMS:
         params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
 
         if mean_f1 > best_mean_f1:
-            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_ner_' + VERSION)
+            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION)
             print('___BETTER PARAMETERS FOUND!___\n')
             print('___THESE PARAMETERS ARE:___', params_dict)
             best_mean_f1 = mean_f1

@@ -20,7 +20,7 @@ from keras import backend as K
 import fasttext
 
 from metrics import fmeasure
-from fasttext_embeddings import text2embeddings
+
 from intent_models import cnn_word_model, cnn_word_model_ner, cnn_word_model_with_sent_emb, cnn_word_model_glove
 from report_intent import report
 from sklearn.metrics import precision_recall_fscore_support
@@ -29,6 +29,7 @@ import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
 from random_search_class import param_gen
 from save_load_model import init_from_scratch, init_from_saved, save
+from fasttext_embeddings import text2embeddings
 from save_predictions import save_predictions
 
 class IntentRecognizer(object):
@@ -52,6 +53,14 @@ class IntentRecognizer(object):
         self.learning_parameters = None
         self.n_classes = len(intents)
         self.n_splits = n_splits
+        self.tag_size = None
+        self.text_size = None
+        self.embedding_size = None
+        self.kernel_sizes = None
+        self.models = None
+        self.model_function = None
+        self.histories = None
+
         if fasttext_embedding_model is not None:
             print("___Fasttext embedding model is loaded___")
             self.fasttext_embedding_model = fasttext_embedding_model
@@ -155,17 +164,16 @@ class IntentRecognizer(object):
             if add_inputs is not None:
                 self.histories.append(self.models[model_ind].fit([X_train_embed[permut], add_inputs[model_ind][permut]],
                                                                  self.y_train[model_ind][permut].reshape(-1, 7),
-                                                                batch_size=self.learning_parameters[model_ind]['batch_size'],
-                                                                epochs=self.learning_parameters[model_ind]['epochs'],
-                                                                validation_split=0.1,
-                                                                verbose=2 * verbose,
-                                                                shuffle = False,
-                                                                callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
+                                                                 batch_size=self.learning_parameters[model_ind]['batch_size'],
+                                                                 epochs=self.learning_parameters[model_ind]['epochs'],
+                                                                 validation_split=0.1,
+                                                                 verbose=2 * verbose,
+                                                                 shuffle = False,
+                                                                 callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
             else:
                 self.histories.append(self.models[model_ind].fit(X_train_embed[permut],
                                                                  self.y_train[model_ind][permut].reshape(-1, 7),
-                                                                 batch_size=self.learning_parameters[model_ind][
-                                                                     'batch_size'],
+                                                                 batch_size=self.learning_parameters[model_ind]['batch_size'],
                                                                  epochs=self.learning_parameters[model_ind]['epochs'],
                                                                  validation_split=0.1,
                                                                  verbose=2 * verbose,
@@ -208,9 +216,9 @@ class IntentRecognizer(object):
     def all_params_to_dict(self):
         params_dict = dict()
         for model_ind in range(self.n_splits):
-            for key in self.network_parameters[model_ind].keys:
+            for key in self.network_parameters[model_ind].keys():
                 params_dict[key + '_' + str(model_ind)] = self.network_parameters[model_ind][key]
-            for key in self.learning_parameters[model_ind].keys:
+            for key in self.learning_parameters[model_ind].keys():
                 params_dict[key + '_' + str(model_ind)] = self.learning_parameters[model_ind][key]
         return params_dict
 
