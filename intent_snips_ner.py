@@ -21,7 +21,7 @@ import fasttext
 
 from metrics import fmeasure
 from fasttext_embeddings import text2embeddings
-from intent_models import cnn_word_model
+from intent_models import cnn_word_model_ner
 from report_intent import report
 
 import sys
@@ -100,7 +100,7 @@ best_learning_params = dict()
 
 f1_scores_for_intents = []
 
-for k in range(16):
+while 1:
     network_params = param_gen(coef_reg_cnn_tag={'range': [0.0001,0.01], 'scale': 'log'},
                                coef_reg_cnn_emb={'range': [0.0001, 0.01],  'scale': 'log'},
                                coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
@@ -141,7 +141,6 @@ for k in range(16):
         train_tags_table = keras.preprocessing.sequence.pad_sequences(train_tags_table, maxlen=text_size,
                                                                       padding='pre')
 
-        X_train_embed = np.dstack((X_train_embed, train_tags_table))
 
         test_tags_table = []
         for k in range(test_data[ind].shape[0]):
@@ -154,9 +153,8 @@ for k in range(16):
         test_tags_table = keras.preprocessing.sequence.pad_sequences(test_tags_table, maxlen=text_size,
                                                                      padding='pre')
 
-        X_test_embed = np.dstack((X_test_embed, test_tags_table))
 
-        models.append(init_from_scratch(cnn_word_model_ner, text_size=text_size, tag_size=tag_size,
+        models.append(init_from_scratch(cnn_word_model_ner, text_size=text_size, tag_size=num_of_tags,
                                         embedding_size=embedding_size,
                                         kernel_sizes=kernel_sizes, **network_params))
 
@@ -165,17 +163,17 @@ for k in range(16):
                       optimizer=optimizer,
                       metrics=['categorical_accuracy',
                                fmeasure])
-        history = models[ind].fit(X_train_embed, y_train.reshape(-1, 7),
+        history = models[ind].fit([X_train_embed, train_tags_table], y_train.reshape(-1, 7),
                             batch_size=learning_params['batch_size'],
                             epochs=learning_params['epochs'],
                             validation_split=0.1,
                             verbose=2, shuffle=True,
                             callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)])
 
-        y_train_pred = models[ind].predict(X_train_embed).reshape(-1, 7)
+        y_train_pred = models[ind].predict([X_train_embed, train_tags_table]).reshape(-1, 7)
         train_preds.extend(y_train_pred)
         train_true.extend(y_train)
-        y_test_pred = models[ind].predict(X_test_embed).reshape(-1, 7)
+        y_test_pred = models[ind].predict([X_test_embed, test_tags_table]).reshape(-1, 7)
         test_preds.extend(y_test_pred)
         test_true.extend(y_test)
 
@@ -187,6 +185,7 @@ for k in range(16):
 
     f1_scores = report(train_true, train_preds, test_true, test_preds, intents)  # lengths - intents
 
+    # TURN ON IF WANT TO FIND THE BEST PARAMETERS
     if np.mean(f1_scores) > best_mean_f1:
         best_network_params = network_params
         best_learning_params = learning_params

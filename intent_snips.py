@@ -184,9 +184,9 @@ while 1:
     if np.mean(f1_scores) > best_mean_f1:
         best_network_params = network_params
         best_learning_params = learning_params
-        # save(models[0], fname='/home/dilyara/data/models/intent_models/snips_intent_for_Mishanya/trained_best_model_0')
-        # save(models[1], fname='/home/dilyara/data/models/intent_models/snips_intent_for_Mishanya/trained_best_model_1')
-        # save(models[2], fname='/home/dilyara/data/models/intent_models/snips_intent_for_Mishanya/trained_best_model_2')
+        save(models[0], fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_0')
+        save(models[1], fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_1')
+        save(models[2], fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_2')
         print('BETTER PARAMETERS FOUND!\n')
         print('PARAMETERS:', best_network_params, best_learning_params)
         best_mean_f1 = np.mean(f1_scores)
