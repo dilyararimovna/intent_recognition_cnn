@@ -41,7 +41,7 @@ class IntentRecognizer(object):
     # data - list of lists or arrays of strings-request len = N_samples
     # classes - list of arrays of one-hot classes N_samples x n_classes
 
-    def __init__(self, intents, data, classes, model_function, to_use_kfold=False, n_splits=None, fasttext_embedding_model=None):
+    def __init__(self, intents, n_splits=None, fasttext_embedding_model=None):
 
         self.intents = intents
         self.X_train = []
@@ -51,9 +51,70 @@ class IntentRecognizer(object):
         self.network_parameters = None
         self.learning_parameters = None
         self.n_classes = len(intents)
+        self.n_splits = n_splits
+        if fasttext_embedding_model is not None:
+            print("___Fasttext embedding model is loaded___")
+            self.fasttext_embedding_model = fasttext_embedding_model
+        print('___Recognizer initialized___')
+
+    def gener_network_parameters(self, **kwargs):
+        print("___Considered network parameters___")
+        self.network_parameters = []
+        for i in range(self.n_splits):
+            self.network_parameters.append(param_gen(**kwargs))    #generated dict
+            print(self.network_parameters[-1])
+        return True
+
+    def gener_learning_parameters(self, **kwargs):
+        print("___Considered learning parameters___")
+        self.learning_parameters = []
+        for i in range(self.n_splits):
+            self.learning_parameters.append(param_gen(**kwargs))   #generated dict
+            print(self.learning_parameters[-1])
+        return True
+
+    def init_network_parameters(self, arg_list):
+        print("___Considered network parameters___")
+        self.network_parameters = arg_list                 #dict
+        print(self.network_parameters)
+        return True
+
+    def init_learning_parameters(self, arg_list):
+        print("___Considered learning parameters___")
+        self.learning_parameters = arg_list                #dict
+        print(self.learning_parameters)
+        return True
+
+    def init_model(self, model_function, text_size, embedding_size, kernel_sizes, add_network_params=None):
+        self.model_function = model_function
+        print("___Model initialized____")
+        if self.network_parameters is None:
+            print("___ERROR: network parameters are not given___")
+            exit(1)
+
+        self.text_size = text_size
+        self.embedding_size = embedding_size
+        self.kernel_sizes = kernel_sizes
+
+        self.models = []
+        for model_ind in range(self.n_splits):
+            if add_network_params is not None:
+                self.models.append(init_from_scratch(self.model_function, text_size=self.text_size, n_classes=self.n_classes,
+                                                     embedding_size=self.embedding_size,
+                                                     kernel_sizes=self.kernel_sizes,
+                                                     **add_network_params,
+                                                     **(self.network_parameters[model_ind])))
+            else:
+                self.models.append(init_from_scratch(self.model_function, text_size=self.text_size, n_classes=self.n_classes,
+                                                     embedding_size=self.embedding_size,
+                                                     kernel_sizes=self.kernel_sizes,
+                                                     **(self.network_parameters[model_ind])))
+        return True
+
+    def fit_model(self, data, classes, to_use_kfold=False, verbose=True, add_inputs=None):
+        print("___Fitting model___")
 
         if to_use_kfold == True:
-            self.n_splits = n_splits
             print("___Stratified splitting data___")
             stratif_y = [np.nonzero(classes[j].values)[0][0] for j in range(data.shape[0])]
             kf_split = sklearn.model_selection.StratifiedKFold(n_splits=n_splits, shuffle=True)
@@ -67,7 +128,6 @@ class IntentRecognizer(object):
                 self.y_test.append(y_test)
         else:
             #this way data is a list of dataframes
-            self.n_splits = len(data)
             print("___Given %d splits of train data___" % self.n_splits)
             for i in range(self.n_splits):
                 X_train = data[i]
@@ -75,85 +135,62 @@ class IntentRecognizer(object):
                 self.X_train.append(X_train)
                 self.y_train.append(y_train)
 
-        if fasttext_embedding_model is not None:
-            print("___Fasttext embedding model is loaded___")
-            self.fasttext_embedding_model = fasttext_embedding_model
 
-        self.model_function = model_function
-        print("___Initialized____")
-
-    def gener_network_parameters(self, **kwargs):
-        print("___Considered network parameters___")
-        self.network_parameters = []
-        for i in range(self.n_splits):
-            self.network_parameters.append(param_gen(**kwargs))    #generated dict
-        return True
-
-    def gener_learning_parameters(self, **kwargs):
-        print("___Considered learning parameters___")
-        self.learning_parameters = []
-        for i in range(self.n_splits):
-            self.learning_parameters.append(param_gen(**kwargs))   #generated dict
-        return True
-
-    def init_network_parameters(self, **kwargs):
-        print("___Considered network parameters___")
-        self.network_parameters = [kwargs]                 #dict
-        return True
-
-    def init_learning_parameters(self, **kwargs):
-        print("___Considered learning parameters___")
-        self.learning_parameters = [kwargs]                #dict
-        return True
-
-    def fit_model(self, text_size, embedding_size, kernel_sizes, verbose=True):
-        print("___Fitting model___")
-        if self.network_parameters is None or self.learning_parameters is None:
-            print("___ERROR: network and learning parameters are not given___")
+        if self.learning_parameters is None:
+            print("___ERROR: learning parameters are not given___")
             exit(1)
-
-        self.text_size = text_size
-        self.embedding_size = embedding_size
-        self.kernel_sizes = kernel_sizes
         self.histories = []
-        self.models = []
 
         for model_ind in range(self.n_splits):
             if self.fasttext_embedding_model is not None:
                 X_train_embed = text2embeddings(self.X_train[model_ind], self.fasttext_embedding_model, self.text_size, self.embedding_size)
-            self.models.append(init_from_scratch(self.model_function, text_size=self.text_size, n_classes=self.n_classes,
-                                                 embedding_size=self.embedding_size,
-                                                 kernel_sizes=self.kernel_sizes, **(self.network_parameters[model_ind])))
-            optimizer = Adam(lr=self.learning_parameters[model_ind]['lear_rate'], decay=self.learning_parameters[model_ind]['lear_rate_decay'])
+
+            optimizer = Adam(lr=self.learning_parameters[model_ind]['lear_rate'], 
+                             decay=self.learning_parameters[model_ind]['lear_rate_decay'])
             self.models[model_ind].compile(loss='categorical_crossentropy',
                                            optimizer=optimizer,
                                            metrics=['categorical_accuracy',
                                            fmeasure])
             permut = np.random.permutation(np.arange(X_train_embed.shape[0]))
-            self.histories.append(self.models[model_ind].fit(X_train_embed[permut], self.y_train[model_ind][permut].reshape(-1, 7),
-                                                            batch_size=self.learning_parameters[model_ind]['batch_size'],
-                                                            epochs=self.learning_parameters[model_ind]['epochs'],
-                                                            validation_split=0.1,
-                                                            verbose=2 * verbose,
-                                                            shuffle = False,
-                                                            callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
+            if add_inputs is not None:
+                self.histories.append(self.models[model_ind].fit([X_train_embed[permut], add_inputs[model_ind][permut]],
+                                                                 self.y_train[model_ind][permut].reshape(-1, 7),
+                                                                batch_size=self.learning_parameters[model_ind]['batch_size'],
+                                                                epochs=self.learning_parameters[model_ind]['epochs'],
+                                                                validation_split=0.1,
+                                                                verbose=2 * verbose,
+                                                                shuffle = False,
+                                                                callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
+            else:
+                self.histories.append(self.models[model_ind].fit(X_train_embed[permut],
+                                                                 self.y_train[model_ind][permut].reshape(-1, 7),
+                                                                 batch_size=self.learning_parameters[model_ind][
+                                                                     'batch_size'],
+                                                                 epochs=self.learning_parameters[model_ind]['epochs'],
+                                                                 validation_split=0.1,
+                                                                 verbose=2 * verbose,
+                                                                 shuffle=False,
+                                                                 callbacks=[
+                                                                     EarlyStopping(monitor='val_loss', min_delta=0.0)]))
+
         return True
 
-    def predict(self, data=None):
+    def predict(self, data=None, add_inputs=None):
         print("___Predictions___")
         if data is not None:
             X_test = data
-
         predictions = []
 
         if self.fasttext_embedding_model is not None:
             for model_ind in range(self.n_splits):
                 X_test_embed = text2embeddings(X_test[model_ind], self.fasttext_embedding_model,
                                                self.text_size, self.embedding_size)
-                predictions.append(self.models[model_ind].predict(X_test_embed).reshape(-1, self.n_classes))
+                if add_inputs is not None:
+                    predictions.append(self.models[model_ind].predict([X_test_embed, add_inputs[model_ind]]).reshape(-1, self.n_classes))
+                else:
+                    predictions.append(self.models[model_ind].predict(X_test_embed).reshape(-1, self.n_classes))
             return predictions
         else:
-            ('Error: No embeddings provided\n')
             return False
 
     def report(self, true, predicts, mode=None):
@@ -169,12 +206,12 @@ class IntentRecognizer(object):
         return(f1_scores)
 
     def all_params_to_dict(self):
-        for i in range(self.n_splits):
-            params_dict = dict()
-            for key in self.network_parameters[i].keys:
-                params_dict[key + '_' + str(i)] = self.network_parameters[i][key]
-            for key in self.learning_parameters[i].keys:
-                params_dict[key + '_' + str(i)] = self.learning_parameters[i][key]
+        params_dict = dict()
+        for model_ind in range(self.n_splits):
+            for key in self.network_parameters[model_ind].keys:
+                params_dict[key + '_' + str(model_ind)] = self.network_parameters[model_ind][key]
+            for key in self.learning_parameters[model_ind].keys:
+                params_dict[key + '_' + str(model_ind)] = self.learning_parameters[model_ind][key]
         return params_dict
 
     def save_models(self, fname):
@@ -182,6 +219,22 @@ class IntentRecognizer(object):
             save(self.models[model_ind],
                  fname=fname + '_' + str(model_ind))
         return True
+
+    def get_tag_table(self, ner_data, tag_size):
+        self.tag_size = tag_size
+        list_of_tag_tables = []
+        for model_ind in range(self.n_splits):
+            tag_table = []
+            for k in range(ner_data[model_ind].shape[0]):
+                tags = [int(tag) for tag in ner_data[model_ind][k].split(' ')]
+                request_tags = []
+                for i_word, tag in enumerate(tags):
+                    request_tags.append([(1 * (tag == m)) for m in range(self.tag_size)])
+                tag_table.append(request_tags)
+            list_of_tag_tables.append(tag_table)
+        return list_of_tag_tables
+
+
 
 
 

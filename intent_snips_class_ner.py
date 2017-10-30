@@ -13,7 +13,7 @@ import fasttext
 from metrics import fmeasure
 from intent_models import cnn_word_model,cnn_word_model_ner
 from intent_recognizer_class import IntentRecognizer
-
+from keras.preprocessing.sequence import pad_sequences
 import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
 from random_search_class import param_gen
@@ -25,10 +25,10 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 
-FIND_BEST_PARAMS = False
-AVERAGE_FOR_PARAMS = True
+FIND_BEST_PARAMS = True
+AVERAGE_FOR_PARAMS = False
 NUM_OF_CALCS = 2
-VERSION = '_softmax_average_0'
+VERSION = '_softmax_ner_average_0'
 
 train_data = []
 
@@ -50,21 +50,23 @@ text_size = 25
 embedding_size = 100
 n_splits = 3
 kernel_sizes=[1,2,3]
+tag_size = 40
 
 intents = ['AddToPlaylist', 'BookRestaurant', 'GetWeather',
            'PlayMusic', 'RateBook', 'SearchCreativeWork',
            'SearchScreeningEvent']
-
-
+#---------------------------------------
 train_requests = [train_data[i].loc[:,'request'].values for i in range(n_splits)]
 train_classes = [train_data[i].loc[:,intents].values for i in range(n_splits)]
 test_requests = [test_data[i].loc[:, 'request'].values for i in range(n_splits)]
 test_classes = [test_data[i].loc[:, intents].values for i in range(n_splits)]
+train_ner = [train_data[i].loc[:, 'ner_tag'].values for i in range(n_splits)]
+test_ner = [test_data[i].loc[:, 'ner_tag'].values for i in range(n_splits)]
 
 if FIND_BEST_PARAMS:
     print("___TO FIND APPROPRIATE PARAMETERS____")
 
-    FindBestRecognizer = IntentRecognizer(intents, fasttext_embedding_model = fasttext_model, n_splits = n_splits)
+    FindBestRecognizer = IntentRecognizer(intents, fasttext_embedding_model=fasttext_model, n_splits=n_splits)
 
     best_mean_f1 = 0.
     best_network_params = dict()
@@ -72,31 +74,43 @@ if FIND_BEST_PARAMS:
     params_f1 = []
 
     while 1:
-        FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
+        FindBestRecognizer.gener_network_parameters(coef_reg_cnn_tag={'range': [0.0001,0.01], 'scale': 'log'},
+                                                    coef_reg_cnn_emb={'range': [0.0001, 0.01],  'scale': 'log'},
                                                     coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
-                                                    filters_cnn={'range': [200,300], 'discrete': True},
-                                                    dense_size={'range': [50,100], 'discrete': True},
+                                                    filters_cnn_emb={'range': [200,300], 'discrete': True},
+                                                    filters_cnn_tag={'range': [100,200], 'discrete': True},
+                                                    dense_size={'range': [50,150], 'discrete': True},
                                                     dropout_rate={'range': [0.4,0.6]})
         FindBestRecognizer.gener_learning_parameters(batch_size={'range': [16,64], 'discrete': True},
                                                      lear_rate={'range': [0.01,0.1], 'scale': 'log'},
                                                      lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
                                                      epochs={'range': [20,50], 'discrete': True, 'scale': 'log'})
-        FindBestRecognizer.init_model(cnn_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
+        FindBestRecognizer.init_model(cnn_word_model_ner, text_size, embedding_size, kernel_sizes,
+                                      add_network_params={'tag_size': tag_size})
 
-        FindBestRecognizer.fit_model(train_requests, train_classes, verbose=True, to_use_kfold=False)
+        list_of_tag_tables = FindBestRecognizer.get_tag_table(ner_data=train_ner, tag_size=tag_size)
+        train_tags = [pad_sequences(list_of_tag_tables[i], maxlen=text_size,
+                                    padding='pre') for i in range(n_splits)]
 
-        train_predictions = FindBestRecognizer.predict(train_requests)
+        FindBestRecognizer.fit_model(train_requests, train_classes, verbose=True, to_use_kfold=False,
+                                     add_inputs=train_tags)
+
+        train_predictions = FindBestRecognizer.predict(train_requests, add_inputs=train_tags)
         FindBestRecognizer.report(np.vstack([train_classes[i] for i in range(n_splits)]),
                                   np.vstack([train_predictions[i] for i in range(n_splits)]),
                                   mode='TRAIN')
 
-        test_predictions = FindBestRecognizer.predict(test_requests)
+        list_of_tag_tables = FindBestRecognizer.get_tag_table(ner_data=test_ner, tag_size=tag_size)
+        test_tags = [pad_sequences(list_of_tag_tables[i], maxlen=text_size,
+                                    padding='pre') for i in range(n_splits)]
+        test_predictions = FindBestRecognizer.predict(test_requests, add_inputs=test_tags)
 
 
         f1_test = FindBestRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                             np.vstack([test_predictions[i] for i in range(n_splits)]),
                                             mode='TEST')
         mean_f1 = np.mean(f1_test)
+
 
         params_dict = FindBestRecognizer.all_params_to_dict()
         params_dict['mean_f1'] = mean_f1
@@ -106,7 +120,7 @@ if FIND_BEST_PARAMS:
         params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
 
         if mean_f1 > best_mean_f1:
-            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION)
+            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_ner_' + VERSION)
             print('___BETTER PARAMETERS FOUND!___\n')
             print('___THESE PARAMETERS ARE:___', params_dict)
             best_mean_f1 = mean_f1
@@ -118,28 +132,43 @@ if AVERAGE_FOR_PARAMS:
     f1_scores_for_intents = []
 
     for p in range(NUM_OF_CALCS):
-        AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.0001, 'coef_reg_den': 0.0001,
-                                                   'filters_cnn': 200, 'dense_size': 50, 'dropout_rate': 0.4},
-                                                   {'coef_reg_cnn': 0.0001, 'coef_reg_den': 0.0001,
-                                                   'filters_cnn': 200, 'dense_size': 50, 'dropout_rate': 0.4},
-                                                   {'coef_reg_cnn': 0.0001, 'coef_reg_den': 0.0001,
-                                                   'filters_cnn': 200, 'dense_size': 50, 'dropout_rate': 0.4}])
+        AverageRecognizer.init_network_parameters([{'coef_reg_cnn_tag': 0.0001, 'coef_reg_cnn_emb':0.0001,
+                                                    'coef_reg_den': 0.0001,
+                                                   'filters_cnn_tag': 200, 'filters_cnn_emb': 200,
+                                                    'dense_size': 50, 'dropout_rate': 0.4},
+                                                   {'coef_reg_cnn_tag': 0.0001, 'coef_reg_cnn_emb': 0.0001,
+                                                    'coef_reg_den': 0.0001,
+                                                    'filters_cnn_tag': 200, 'filters_cnn_emb': 200,
+                                                    'dense_size': 50, 'dropout_rate': 0.4},
+                                                   {'coef_reg_cnn_tag': 0.0001, 'coef_reg_cnn_emb': 0.0001,
+                                                    'coef_reg_den': 0.0001,
+                                                    'filters_cnn_tag': 200, 'filters_cnn_emb': 200,
+                                                    'dense_size': 50, 'dropout_rate': 0.4}])
         AverageRecognizer.init_learning_parameters([{'batch_size': 16, 'lear_rate':0.01,
                                                      'lear_rate_decay': 0.01, 'epochs': 20},
                                                     {'batch_size': 16, 'lear_rate':0.01,
                                                      'lear_rate_decay': 0.01, 'epochs': 20},
                                                     {'batch_size': 16, 'lear_rate':0.01,
                                                      'lear_rate_decay': 0.01, 'epochs': 20}])
-        AverageRecognizer.init_model(cnn_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
+        AverageRecognizer.init_model(cnn_word_model_ner, text_size, embedding_size, kernel_sizes,
+                                      add_network_params={'tag_size': tag_size})
 
-        AverageRecognizer.fit_model(train_requests, train_classes, to_use_kfold=False, verbose=True)
+        list_of_tag_tables = AverageRecognizer.get_tag_table(ner_data=train_ner, tag_size=tag_size)
+        train_tags = [pad_sequences(list_of_tag_tables[i], maxlen=text_size,
+                                    padding='pre') for i in range(n_splits)]
 
-        train_predictions = AverageRecognizer.predict(train_requests)
+        AverageRecognizer.fit_model(train_requests, train_classes, verbose=True, to_use_kfold=False,
+                                     add_inputs=train_tags)
+
+        train_predictions = AverageRecognizer.predict(train_requests, add_inputs=train_tags)
         AverageRecognizer.report(np.vstack([train_classes[i] for i in range(n_splits)]),
-                                 np.vstack([train_predictions[i] for i in range(n_splits)]),
-                                 mode='TRAIN')
+                                  np.vstack([train_predictions[i] for i in range(n_splits)]),
+                                  mode='TRAIN')
 
-        test_predictions = AverageRecognizer.predict(test_requests)
+        list_of_tag_tables = AverageRecognizer.get_tag_table(ner_data=test_ner, tag_size=tag_size)
+        test_tags = [pad_sequences(list_of_tag_tables[i], maxlen=text_size,
+                                    padding='pre') for i in range(n_splits)]
+        test_predictions = AverageRecognizer.predict(test_requests, add_inputs=test_tags)
 
         f1_test = AverageRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                            np.vstack([test_predictions[i] for i in range(n_splits)]),
