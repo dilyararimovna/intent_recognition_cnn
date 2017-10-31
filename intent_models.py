@@ -85,13 +85,11 @@ def cnn_word_model_ner(text_size, n_classes, tag_size, embedding_size, filters_c
     model = Model(inputs=[inp_emb, inp_tag], outputs=act_output)
     return model
 
-
 def cnn_word_model_with_sent_emb(text_size, n_classes, embedding_size, sent_embedding_size, filters_cnn,
-	                             kernel_sizes, coef_reg_cnn, coef_reg_den, dropout_rate, dense_size):
+                                 kernel_sizes, coef_reg_cnn, coef_reg_den, dropout_rate, dense_size):
+
     inp = Input(shape=(text_size, embedding_size))
     sent_emb = Input(shape=(sent_embedding_size,))
-
-    #sent_emb_resh = Reshape(target_shape=(1,sent_embedding_size))(sent_emb)
 
     outputs = []
     for i in range(len(kernel_sizes)):
@@ -121,7 +119,7 @@ def cnn_word_model_with_sent_emb(text_size, n_classes, embedding_size, sent_embe
     output = Dropout(rate=dropout_rate)(output)
     output = Dense(n_classes, activation=None, kernel_regularizer=l2(coef_reg_den))(output)
     output = BatchNormalization()(output)
-    act_output = Activation('sigmoid')(output)
+    act_output = Activation('softmax')(output)
     model = Model(inputs=[inp, sent_emb], outputs=act_output)
     return model
 
@@ -150,6 +148,6 @@ def cnn_word_model_glove(text_size, n_classes, embedding_size, filters_cnn,
     output = Dropout(rate=dropout_rate)(output)
     output = Dense(n_classes, activation=None, kernel_regularizer=l2(coef_reg_den))(output)
     output = BatchNormalization()(output)
-    act_output = Activation('sigmoid')(output)
+    act_output = Activation('softmax')(output)
     model = Model(inputs=inp, outputs=act_output)
     return model

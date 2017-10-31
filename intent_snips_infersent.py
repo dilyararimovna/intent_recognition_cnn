@@ -12,11 +12,8 @@ import numpy as np
 
 import sklearn.model_selection
 
-import keras
-from keras.optimizers import Adam, SGD
-from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
-import json
-from keras import backend as K
+from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping
 import fasttext
 
 from metrics import fmeasure
@@ -25,7 +22,6 @@ from intent_models import cnn_word_model_with_sent_emb
 from report_intent import report
 import cv2,torch
 import numpy as np
-import nltk
 
 import sys
 sys.path.append('/home/dilyara.baymurzina')

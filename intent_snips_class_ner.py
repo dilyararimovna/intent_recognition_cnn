@@ -24,19 +24,25 @@ tf.set_random_seed(SEED)
 FIND_BEST_PARAMS = True
 AVERAGE_FOR_PARAMS = False
 NUM_OF_CALCS = 2
-VERSION = '_softmax_ner_findbest_0'
+VERSION = '_softmax_ner_crf_findbest_0'
 
 train_data = []
 
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_0"))
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_1"))
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_2"))
+path_to_snips_data = "/home/dilyara/data/data_files/snips/"
+
+# train_data.append(pd.read_csv(path_to_snips_data + "snips_ner_gold/snips_ner_gold_0/snips_train_0"))
+# train_data.append(pd.read_csv(path_to_snips_data + "snips_ner_gold/snips_ner_gold_0/snips_train_1"))
+# train_data.append(pd.read_csv(path_to_snips_data + "snips_ner_gold/snips_ner_gold_0/snips_train_2"))
+train_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_train_0.csv"))
+train_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_train_1.csv"))
+train_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_train_2.csv"))
+
 
 test_data = []
 
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_0"))
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_1"))
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_2"))
+test_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_test_0.csv"))
+test_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_test_1.csv"))
+test_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_test_2.csv"))
 
 fasttext_model_file = '/home/dilyara/data/data_files/embeddings/reddit_fasttext_model.bin'
 fasttext_model = fasttext.load_model(fasttext_model_file)
@@ -69,7 +75,7 @@ if FIND_BEST_PARAMS:
     best_learning_params = dict()
     params_f1 = []
 
-    while 1:
+    for p in range(20):
         FindBestRecognizer.gener_network_parameters(coef_reg_cnn_tag={'range': [0.0001,0.01], 'scale': 'log'},
                                                     coef_reg_cnn_emb={'range': [0.0001, 0.01],  'scale': 'log'},
                                                     coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},

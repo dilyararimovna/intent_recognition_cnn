@@ -25,10 +25,10 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 
-FIND_BEST_PARAMS = False
-AVERAGE_FOR_PARAMS = True
+FIND_BEST_PARAMS = True
+AVERAGE_FOR_PARAMS = False
 NUM_OF_CALCS = 2
-VERSION = '_softmax_average_byparts_0'
+VERSION = '_softmax_findbest_byparts_0'
 
 train_data = []
 
@@ -61,13 +61,16 @@ test_classes = [test_data[i].loc[:, intents].values for i in range(n_splits)]
 
 for train_size in train_sizes:
     print("\n\n______NUMBER OF TRAIN SAMPLES PER INTENT = %d___________" % train_size)
-    train_index_part = []
-    for i, intent in enumerate(intents):
-        samples_intent = np.nonzero(train_classes[:, i])[0]
-        train_index_part.extend(list(np.random.choice(samples_intent, size=train_size)))
+    train_index_parts = []
+    for model_ind in range(n_splits):
+        train_part = []
+        for i, intent in enumerate(intents):
+            samples_intent = np.nonzero(train_classes[model_ind][:,i])[0]
+            train_part.extend(list(np.random.choice(samples_intent, size=train_size)))
+        train_index_parts.append(train_part)
 
-    train_requests_part = train_requests[train_index_part]
-    train_classes_part = train_classes[train_index_part]
+    train_requests_part = [train_requests[model_ind][train_index_parts[model_ind]] for model_ind in range(n_splits)]
+    train_classes_part = [train_classes[model_ind][train_index_parts[model_ind]] for model_ind in range(n_splits)]
 
     if FIND_BEST_PARAMS:
         print("___TO FIND APPROPRIATE PARAMETERS____")
@@ -79,7 +82,7 @@ for train_size in train_sizes:
         best_learning_params = dict()
         params_f1 = []
 
-        while 1:
+        for p in range(100):
             FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
                                                         coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
                                                         filters_cnn={'range': [200,300], 'discrete': True},
@@ -114,7 +117,7 @@ for train_size in train_sizes:
             params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
 
             if mean_f1 > best_mean_f1:
-                FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION + '_byparts' + str(train_size))
+                FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION + '_' + str(train_size))
                 print('___BETTER PARAMETERS FOUND!___\n')
                 print('___THESE PARAMETERS ARE:___', params_dict)
                 best_mean_f1 = mean_f1
