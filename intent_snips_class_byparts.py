@@ -46,7 +46,8 @@ text_size = 25
 embedding_size = 100
 n_splits = 1
 kernel_sizes=[1,2,3]
-train_sizes = [10, 25, 50, 100, 200, 500, 1000] # per intent
+#train_sizes = [10, 25, 50, 100, 200, 500, 1000] # per intent
+train_sizes = [10, 25, 50, 100, 200] # per intent
 
 
 intents = ['AddToPlaylist', 'BookRestaurant', 'GetWeather',
@@ -82,7 +83,7 @@ for train_size in train_sizes:
         best_learning_params = dict()
         params_f1 = []
 
-        for p in range(100):
+        for p in range(20):
             FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
                                                         coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
                                                         filters_cnn={'range': [200,300], 'discrete': True},
@@ -112,9 +113,8 @@ for train_size in train_sizes:
             params_dict = FindBestRecognizer.all_params_to_dict()
             params_dict['mean_f1'] = mean_f1
             params_f1.append(params_dict)
-            print(params_f1)
             params_f1_dataframe = pd.DataFrame(params_f1)
-            params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
+            params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '_' + str(train_size) + '.txt')
 
             if mean_f1 > best_mean_f1:
                 FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION + '_' + str(train_size))

@@ -123,22 +123,25 @@ def cnn_word_model_with_sent_emb(text_size, n_classes, embedding_size, sent_embe
     model = Model(inputs=[inp, sent_emb], outputs=act_output)
     return model
 
-def cnn_word_model_glove(text_size, n_classes, embedding_size, filters_cnn,
-                         kernel_sizes, coef_reg_cnn, coef_reg_den, dropout_rate, dense_size):
 
-    inp = Input(shape=(text_size, embedding_size))
+def cnn_word_model_ner_2(text_size, n_classes, tag_size, embedding_size, filters_cnn_emb, filters_cnn_tag,
+                         kernel_sizes, coef_reg_cnn_emb, coef_reg_cnn_tag, coef_reg_den,
+                         dropout_rate, dense_size):
+    inp_emb = Input(shape=(text_size, embedding_size))
+    inp_tag = Input(shape=(text_size, tag_size))
+    inp = concatenate([inp_emb, inp_tag], axis=2)
 
-    outputs = []
+    outputs_emb = []
     for i in range(len(kernel_sizes)):
-        output_i = Conv1D(filters_cnn, kernel_size=kernel_sizes[i], activation=None,
-                          kernel_regularizer=l2(coef_reg_cnn), padding='same')(inp)
+        output_i = Conv1D(filters_cnn_emb, kernel_size=kernel_sizes[i], activation=None,
+                          kernel_regularizer=l2(coef_reg_cnn_emb), padding='same')(inp)
         output_i = BatchNormalization()(output_i)
         output_i = Activation('relu')(output_i)
         output_i = GlobalMaxPooling1D()(output_i)
-        outputs.append(output_i)
+        outputs_emb.append(output_i)
 
-    output = concatenate(outputs, axis=1)
-    print('Concatenate shape:', output.shape)
+    output = concatenate(outputs_emb, axis=1)
+    print('Concatenate emb shape:', output.shape)
 
     output = Dropout(rate=dropout_rate)(output)
     output = Dense(dense_size, activation=None,
@@ -149,5 +152,5 @@ def cnn_word_model_glove(text_size, n_classes, embedding_size, filters_cnn,
     output = Dense(n_classes, activation=None, kernel_regularizer=l2(coef_reg_den))(output)
     output = BatchNormalization()(output)
     act_output = Activation('softmax')(output)
-    model = Model(inputs=inp, outputs=act_output)
+    model = Model(inputs=[inp_emb, inp_tag], outputs=act_output)
     return model

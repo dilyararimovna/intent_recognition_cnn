@@ -24,10 +24,10 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 
-FIND_BEST_PARAMS = True
-AVERAGE_FOR_PARAMS = False
-NUM_OF_CALCS = 2
-VERSION = '_softmax_infersent_findbest_0'
+FIND_BEST_PARAMS = False
+AVERAGE_FOR_PARAMS = True
+NUM_OF_CALCS = 16
+VERSION = '_softmax_infersent_findbest_1'
 
 train_data = []
 
@@ -96,7 +96,7 @@ if FIND_BEST_PARAMS:
         FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
                                                     coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
                                                     filters_cnn={'range': [200,300], 'discrete': True},
-                                                    dense_size={'range': [50,150], 'discrete': True},
+                                                    dense_size={'range': [100,300], 'discrete': True},
                                                     dropout_rate={'range': [0.4,0.6]})
         FindBestRecognizer.gener_learning_parameters(batch_size={'range': [16,64], 'discrete': True},
                                                      lear_rate={'range': [0.01,0.1], 'scale': 'log'},
@@ -125,7 +125,7 @@ if FIND_BEST_PARAMS:
         params_dict = FindBestRecognizer.all_params_to_dict()
         params_dict['mean_f1'] = mean_f1
         params_f1.append(params_dict)
-        print(params_f1)
+
         params_f1_dataframe = pd.DataFrame(params_f1)
         params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
 
@@ -142,21 +142,33 @@ if AVERAGE_FOR_PARAMS:
     f1_scores_for_intents = []
 
     for p in range(NUM_OF_CALCS):
-        AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.0001, 'coef_reg_den': 0.0001,
-                                                   'filters_cnn': 200,
-                                                    'dense_size': 50, 'dropout_rate': 0.4},
-                                                   {'coef_reg_cnn': 0.0001, 'coef_reg_den': 0.0001,
-                                                    'filters_cnn': 200,
-                                                    'dense_size': 50, 'dropout_rate': 0.4},
-                                                   {'coef_reg_cnn': 0.0001, 'coef_reg_den': 0.0001,
-                                                    'filters_cnn': 200,
-                                                    'dense_size': 50, 'dropout_rate': 0.4}])
-        AverageRecognizer.init_learning_parameters([{'batch_size': 16, 'lear_rate':0.01,
-                                                     'lear_rate_decay': 0.01, 'epochs': 20},
-                                                    {'batch_size': 16, 'lear_rate':0.01,
-                                                     'lear_rate_decay': 0.01, 'epochs': 20},
-                                                    {'batch_size': 16, 'lear_rate':0.01,
-                                                     'lear_rate_decay': 0.01, 'epochs': 20}])
+        AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.0010225116000847144,
+                                                    'coef_reg_den': 0.00068056793126683966,
+                                                    'filters_cnn': 209,
+                                                    'dense_size': 170,
+                                                    'dropout_rate': 0.5760181018885207},
+                                                   {'coef_reg_cnn': 0.00064924490940636498,
+                                                    'coef_reg_den': 0.0013192731688960911,
+                                                    'filters_cnn': 204,
+                                                    'dense_size': 251,
+                                                    'dropout_rate': 0.5977199618731714},
+                                                   {'coef_reg_cnn': 0.0017129820585559845,
+                                                    'coef_reg_den': 0.003578794519809381,
+                                                    'filters_cnn': 271,
+                                                    'dense_size': 172,
+                                                    'dropout_rate': 0.5442798070184602}])
+        AverageRecognizer.init_learning_parameters([{'batch_size': 19,
+                                                     'lear_rate': 0.0176737249436766,
+                                                     'lear_rate_decay': 0.015183738857430875,
+                                                     'epochs': 21},
+                                                    {'batch_size': 23,
+                                                     'lear_rate': 0.039497026519815251,
+                                                     'lear_rate_decay': 0.090031957097578885,
+                                                     'epochs': 34},
+                                                    {'batch_size': 21,
+                                                     'lear_rate': 0.064921241572209853,
+                                                     'lear_rate_decay': 0.072792117431381795,
+                                                     'epochs': 47}])
         AverageRecognizer.init_model(cnn_word_model_with_sent_emb, text_size, embedding_size, kernel_sizes,
                                       add_network_params={'sent_embedding_size': sent_embedding_size})
 

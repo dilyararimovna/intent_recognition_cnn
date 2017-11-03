@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import fasttext
 
-from intent_models import cnn_word_model,cnn_word_model_ner
+from intent_models import cnn_word_model, cnn_word_model_ner, cnn_word_model_ner_2
 from intent_recognizer_class import IntentRecognizer
 from keras.preprocessing.sequence import pad_sequences
 import sys
@@ -23,7 +23,7 @@ tf.set_random_seed(SEED)
 
 FIND_BEST_PARAMS = True
 AVERAGE_FOR_PARAMS = False
-NUM_OF_CALCS = 2
+NUM_OF_CALCS = 16
 VERSION = '_softmax_ner_crf_findbest_0'
 
 train_data = []
@@ -39,6 +39,10 @@ train_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_tr
 
 
 test_data = []
+
+# test_data.append(pd.read_csv(path_to_snips_data + "snips_ner_gold/snips_ner_gold_0/snips_test_0"))
+# test_data.append(pd.read_csv(path_to_snips_data + "snips_ner_gold/snips_ner_gold_0/snips_test_1"))
+# test_data.append(pd.read_csv(path_to_snips_data + "snips_ner_gold/snips_ner_gold_0/snips_test_2"))
 
 test_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_test_0.csv"))
 test_data.append(pd.read_csv(path_to_snips_data + "snips_crf_with_idxs/snips_test_1.csv"))
@@ -117,7 +121,7 @@ if FIND_BEST_PARAMS:
         params_dict = FindBestRecognizer.all_params_to_dict()
         params_dict['mean_f1'] = mean_f1
         params_f1.append(params_dict)
-        print(params_f1)
+
         params_f1_dataframe = pd.DataFrame(params_f1)
         params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
 
@@ -134,24 +138,74 @@ if AVERAGE_FOR_PARAMS:
     f1_scores_for_intents = []
 
     for p in range(NUM_OF_CALCS):
-        AverageRecognizer.init_network_parameters([{'coef_reg_cnn_tag': 0.0001, 'coef_reg_cnn_emb':0.0001,
-                                                    'coef_reg_den': 0.0001,
-                                                   'filters_cnn_tag': 200, 'filters_cnn_emb': 200,
-                                                    'dense_size': 50, 'dropout_rate': 0.4},
-                                                   {'coef_reg_cnn_tag': 0.0001, 'coef_reg_cnn_emb': 0.0001,
-                                                    'coef_reg_den': 0.0001,
-                                                    'filters_cnn_tag': 200, 'filters_cnn_emb': 200,
-                                                    'dense_size': 50, 'dropout_rate': 0.4},
-                                                   {'coef_reg_cnn_tag': 0.0001, 'coef_reg_cnn_emb': 0.0001,
-                                                    'coef_reg_den': 0.0001,
-                                                    'filters_cnn_tag': 200, 'filters_cnn_emb': 200,
-                                                    'dense_size': 50, 'dropout_rate': 0.4}])
-        AverageRecognizer.init_learning_parameters([{'batch_size': 16, 'lear_rate':0.01,
-                                                     'lear_rate_decay': 0.01, 'epochs': 20},
-                                                    {'batch_size': 16, 'lear_rate':0.01,
-                                                     'lear_rate_decay': 0.01, 'epochs': 20},
-                                                    {'batch_size': 16, 'lear_rate':0.01,
-                                                     'lear_rate_decay': 0.01, 'epochs': 20}])
+        #for ner crf
+        AverageRecognizer.init_network_parameters([{'coef_reg_cnn_tag': 0.00066350094692529645,
+                                                    'coef_reg_cnn_emb': 0.00047323342362332759,
+                                                    'coef_reg_den': 0.0034790278642858716,
+                                                    'filters_cnn_emb': 226,
+                                                    'filters_cnn_tag': 145,
+                                                    'dense_size': 117,
+                                                    'dropout_rate': 0.4821011382436993},
+                                                   {'coef_reg_cnn_tag': 0.00011549422217361988,
+                                                    'coef_reg_cnn_emb': 0.0056291264624271538,
+                                                    'coef_reg_den': 0.00022686582264503204,
+                                                    'filters_cnn_emb': 298,
+                                                    'filters_cnn_tag': 135,
+                                                    'dense_size': 108,
+                                                    'dropout_rate': 0.41812048375665867},
+                                                   {'coef_reg_cnn_tag': 0.0081031832570831533,
+                                                    'coef_reg_cnn_emb': 0.00017798242982311515,
+                                                    'coef_reg_den': 0.0034131887364826454,
+                                                    'filters_cnn_emb': 288,
+                                                    'filters_cnn_tag': 111,
+                                                    'dense_size': 129,
+                                                    'dropout_rate': 0.5843603954268347}])
+        AverageRecognizer.init_learning_parameters([{'batch_size': 24,
+                                                     'lear_rate': 0.01985462354329437,
+                                                     'lear_rate_decay': 0.043865053959028635,
+                                                     'epochs': 48},
+                                                    {'batch_size': 23,
+                                                     'lear_rate': 0.021651609596649066,
+                                                     'lear_rate_decay': 0.038241618449973806,
+                                                     'epochs': 28},
+                                                    {'batch_size': 47,
+                                                     'lear_rate': 0.031771987829375958,
+                                                     'lear_rate_decay': 0.015396011710902565,
+                                                     'epochs': 37}])
+        #for truth ner
+        # AverageRecognizer.init_network_parameters([{'coef_reg_cnn_tag': 0.0031907564045027003,
+        #                                             'coef_reg_cnn_emb': 0.00057584937340040025,
+        #                                             'coef_reg_den': 0.00024229326256001223,
+        #                                             'filters_cnn_emb': 295,
+        #                                             'filters_cnn_tag': 108,
+        #                                             'dense_size': 119,
+        #                                             'dropout_rate': 0.5829969163684273},
+        #                                            {'coef_reg_cnn_tag': 0.00048274629929004467,
+        #                                             'coef_reg_cnn_emb': 0.0074890849204680351,
+        #                                             'coef_reg_den': 0.0014876632446491709,
+        #                                             'filters_cnn_emb': 250,
+        #                                             'filters_cnn_tag': 126,
+        #                                             'dense_size': 118,
+        #                                             'dropout_rate': 0.5414202399581685},
+        #                                            {'coef_reg_cnn_tag': 0.0004143495041595739,
+        #                                             'coef_reg_cnn_emb': 0.0044085152610540178,
+        #                                             'coef_reg_den': 0.00077312581675672762,
+        #                                             'filters_cnn_emb': 207,
+        #                                             'filters_cnn_tag': 102,
+        #                                             'dense_size': 57,
+        #                                             'dropout_rate': 0.49322297307786034}])
+        # AverageRecognizer.init_learning_parameters([{'batch_size': 30,
+        #                                              'lear_rate': 0.084277601001224903,
+        #                                              'lear_rate_decay': 0.028767270475603395,
+        #                                              'epochs': 21},
+        #                                             {'batch_size': 46,
+        #                                              'lear_rate': 0.033319806657432588,
+        #                                              'lear_rate_decay': 0.059555438350099951,
+        #                                              'epochs': 28},
+        #                                             {'batch_size': 33,
+        #                                              'lear_rate': 0.016023687305964939,
+        #                                              'lear_rate_decay': 0.045488750345919336,
+        #                                              'epochs': 39}])
         AverageRecognizer.init_model(cnn_word_model_ner, text_size, embedding_size, kernel_sizes,
                                       add_network_params={'tag_size': tag_size})
 

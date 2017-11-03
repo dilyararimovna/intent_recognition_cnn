@@ -21,7 +21,7 @@ import fasttext
 
 from metrics import fmeasure
 
-from intent_models import cnn_word_model, cnn_word_model_ner, cnn_word_model_with_sent_emb, cnn_word_model_glove
+from intent_models import cnn_word_model, cnn_word_model_ner, cnn_word_model_with_sent_emb,cnn_word_model_ner_2
 from report_intent import report
 from sklearn.metrics import precision_recall_fscore_support
 
