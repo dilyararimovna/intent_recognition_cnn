@@ -7,6 +7,8 @@ from keras.layers.core import Dropout, Reshape
 from keras.layers.normalization import BatchNormalization
 from keras.regularizers import l2
 
+from keras.layers import Bidirectional, LSTM
+
 import tensorflow as tf
 SEED = 23
 np.random.seed(SEED)
@@ -153,4 +155,25 @@ def cnn_word_model_ner_2(text_size, n_classes, tag_size, embedding_size, filters
     output = BatchNormalization()(output)
     act_output = Activation('softmax')(output)
     model = Model(inputs=[inp_emb, inp_tag], outputs=act_output)
+    return model
+
+def lstm_word_model(text_size, n_classes, embedding_size, filters_cnn,
+                    kernel_sizes, coef_reg_cnn, coef_reg_den, dropout_rate, dense_size):
+    embed_input = Input(shape=(text_size, embedding_size))
+
+    output = Bidirectional(LSTM(filters_cnn, activation='tanh',
+                                  kernel_regularizer=l2(coef_reg_cnn),
+                                  dropout=dropout_rate))(embed_input)
+
+    output = Dropout(rate=dropout_rate)(output)
+    output = Dense(dense_size, activation=None,
+                   kernel_regularizer=l2(coef_reg_den))(output)
+    output = BatchNormalization()(output)
+    output = Activation('relu')(output)
+    output = Dropout(rate=dropout_rate)(output)
+    output = Dense(n_classes, activation=None,
+                   kernel_regularizer=l2(coef_reg_den))(output)
+    output = BatchNormalization()(output)
+    act_output = Activation('softmax')(output)
+    model = Model(inputs=embed_input, outputs=act_output)
     return model

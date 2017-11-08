@@ -11,7 +11,7 @@ import numpy as np
 import fasttext
 
 from metrics import fmeasure
-from intent_models import cnn_word_model,cnn_word_model_ner
+from intent_models import cnn_word_model,cnn_word_model_ner, lstm_word_model
 from intent_recognizer_class import IntentRecognizer
 
 import sys
@@ -28,7 +28,7 @@ tf.set_random_seed(SEED)
 FIND_BEST_PARAMS = False
 AVERAGE_FOR_PARAMS = True
 NUM_OF_CALCS = 16
-VERSION = '_softmax_best_3'
+VERSION = '_softmax_best_lstm_0'
 
 train_data = []
 
@@ -71,7 +71,7 @@ if FIND_BEST_PARAMS:
     best_learning_params = dict()
     params_f1 = []
 
-    for p in range(20):
+    for p in range(100):
         FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
                                                     coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
                                                     filters_cnn={'range': [200,300], 'discrete': True},
@@ -119,6 +119,7 @@ if AVERAGE_FOR_PARAMS:
     f1_scores_for_intents = []
 
     for p in range(NUM_OF_CALCS):
+        # for cnn model
         AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.00036855026787845302,
                                                     'coef_reg_den': 0.00029720938577019042,
                                                     'filters_cnn': 250,
@@ -142,7 +143,37 @@ if AVERAGE_FOR_PARAMS:
                                                      'lear_rate': 0.016858859621336184,
                                                      'lear_rate_decay': 0.037668912128691327,
                                                      'epochs': 45}])
-        AverageRecognizer.init_model(cnn_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
+
+        # for lstm model
+        # AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.004690316263478835,
+        #                                             'coef_reg_den': 0.00016111260276509366,
+        #                                             'filters_cnn': 283,
+        #                                             'dense_size': 81,
+        #                                             'dropout_rate': 0.4646244872675152},
+        #                                            {'coef_reg_cnn': 0.0019815155300732133,
+        #                                             'coef_reg_den': 0.0011118454048493782,
+        #                                             'filters_cnn': 217,
+        #                                             'dense_size': 100,
+        #                                             'dropout_rate': 0.5033032073608426},
+        #                                            {'coef_reg_cnn': 0.0021683825957939935,
+        #                                             'coef_reg_den': 0.0016402686797785651,
+        #                                             'filters_cnn': 223,
+        #                                             'dense_size': 72,
+        #                                             'dropout_rate': 0.5916168228181803}])
+        # AverageRecognizer.init_learning_parameters([{'batch_size': 48,
+        #                                              'lear_rate': 0.020044162550942473,
+        #                                              'lear_rate_decay': 0.011366401170819898,
+        #                                              'epochs': 28},
+        #                                             {'batch_size': 50,
+        #                                              'lear_rate': 0.016578541239442787,
+        #                                              'lear_rate_decay': 0.030408401174317149,
+        #                                              'epochs': 26},
+        #                                             {'batch_size': 58,
+        #                                              'lear_rate': 0.011329814924816623,
+        #                                              'lear_rate_decay': 0.014844377557905427,
+        #                                              'epochs': 29}])
+
+        AverageRecognizer.init_model(lstm_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
 
         AverageRecognizer.fit_model(train_requests, train_classes, to_use_kfold=False, verbose=True)
 
