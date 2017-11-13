@@ -114,7 +114,7 @@ if FIND_BEST_PARAMS:
 
         f1_test = FindBestRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                             np.vstack([test_predictions[i] for i in range(n_splits)]),
-                                            mode='TEST')
+                                            mode='TEST')[0]
         mean_f1 = np.mean(f1_test)
 
 
@@ -228,7 +228,7 @@ if AVERAGE_FOR_PARAMS:
 
         f1_test = AverageRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                            np.vstack([test_predictions[i] for i in range(n_splits)]),
-                                           mode='TEST')
+                                           mode='TEST')[0]
         f1_scores_for_intents.append(f1_test)
     f1_scores_for_intents = np.asarray(f1_scores_for_intents)
     for intent_id in range(len(intents)):

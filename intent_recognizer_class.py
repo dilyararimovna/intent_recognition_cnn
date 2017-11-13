@@ -23,7 +23,7 @@ from metrics import fmeasure
 
 from intent_models import cnn_word_model, cnn_word_model_ner, cnn_word_model_with_sent_emb,cnn_word_model_ner_2
 from report_intent import report
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support, f1_score
 
 import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
@@ -31,6 +31,11 @@ from random_search_class import param_gen
 from save_load_model import init_from_scratch, init_from_saved, save
 from fasttext_embeddings import text2embeddings
 from save_predictions import save_predictions
+
+
+def one_hot2ids(one_hot_labels):
+    return np.argmax(one_hot_labels, axis=1)
+
 
 class IntentRecognizer(object):
 
@@ -163,7 +168,7 @@ class IntentRecognizer(object):
             permut = np.random.permutation(np.arange(X_train_embed.shape[0]))
             if add_inputs is not None:
                 self.histories.append(self.models[model_ind].fit([X_train_embed[permut], add_inputs[model_ind][permut]],
-                                                                 self.y_train[model_ind][permut].reshape(-1, 7),
+                                                                 self.y_train[model_ind][permut].reshape(-1, self.n_classes),
                                                                  batch_size=self.learning_parameters[model_ind]['batch_size'],
                                                                  epochs=self.learning_parameters[model_ind]['epochs'],
                                                                  validation_split=0.1,
@@ -172,7 +177,7 @@ class IntentRecognizer(object):
                                                                  callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
             else:
                 self.histories.append(self.models[model_ind].fit(X_train_embed[permut],
-                                                                 self.y_train[model_ind][permut].reshape(-1, 7),
+                                                                 self.y_train[model_ind][permut].reshape(-1,self.n_classes),
                                                                  batch_size=self.learning_parameters[model_ind]['batch_size'],
                                                                  epochs=self.learning_parameters[model_ind]['epochs'],
                                                                  validation_split=0.1,
@@ -205,13 +210,18 @@ class IntentRecognizer(object):
         print("___Report___")
         if mode is not None:
             print("___MODE is %s___" % mode)
+
+        f1_macro = f1_score(one_hot2ids(true), one_hot2ids(predicts), average='macro')
+        f1_weighted = f1_score(one_hot2ids(true), one_hot2ids(predicts), average='weighted')
+        print('F1 macro: %f', f1_macro)
+        print('F1 weighted: %f', f1_weighted)
         print("%s \t %s \t%s \t %s \t %s" % ('type', 'precision', 'recall', 'f1-score', 'support'))
         f1_scores = []
         for ind, intent in enumerate(self.intents):
             scores = np.asarray(precision_recall_fscore_support(true[:, ind], np.round(predicts[:, ind])))[:, 1]
             print("%s \t %f \t %f \t %f \t %f" % (intent, scores[0], scores[1], scores[2], scores[3]))
             f1_scores.append(scores[2])
-        return(f1_scores)
+        return(f1_scores, f1_macro, f1_weighted)
 
     def all_params_to_dict(self):
         params_dict = dict()

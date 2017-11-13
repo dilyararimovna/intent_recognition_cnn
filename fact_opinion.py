@@ -9,11 +9,11 @@ set_session(tf.Session(config=config))
 import pandas as pd
 import numpy as np
 import fasttext
+from sklearn.model_selection import train_test_split
 
 from metrics import fmeasure
-from intent_models import cnn_word_model,cnn_word_model_ner, lstm_word_model
+from intent_models import cnn_word_model_sigmoid
 from intent_recognizer_class import IntentRecognizer
-
 
 import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
@@ -26,46 +26,44 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 
-FIND_BEST_PARAMS = False
-AVERAGE_FOR_PARAMS = True
+FIND_BEST_PARAMS = True
+AVERAGE_FOR_PARAMS = False
 NUM_OF_CALCS = 16
-VERSION = '_softmax_best_lstm_0'
+VERSION = '_cnn_word_1'
 
 train_data = []
-
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_0"))
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_1"))
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_2"))
-
 test_data = []
 
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_0"))
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_1"))
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_2"))
+data = pd.read_csv("/home/dilyara/data/data_files/fact_opinion/data.csv", sep='\t')
 
-fasttext_model_file = '/home/dilyara/data/data_files/embeddings/reddit_fasttext_model.bin'
+train, test = train_test_split(data, test_size=0.2)
+train_data.append(train.set_index(np.arange(train.shape[0])))
+
+test_data.append(test.set_index(np.arange(test.shape[0])))
+
+fasttext_model_file = '/home/dilyara/data/data_files/embeddings/fasttext_model_twitter.bin'
 fasttext_model = fasttext.load_model(fasttext_model_file)
+
+print('Train data', train_data[0].head())
+print('Test data: ', test_data[0].head())
 
 #-------------PARAMETERS----------------
 text_size = 25
 embedding_size = 100
-n_splits = 3
+n_splits = 1
 kernel_sizes=[1,2,3]
 
-intents = ['AddToPlaylist', 'BookRestaurant', 'GetWeather',
-           'PlayMusic', 'RateBook', 'SearchCreativeWork',
-           'SearchScreeningEvent']
+intents = ['is_fact', 'is_opinion', 'ignore']
 
-
-train_requests = [train_data[i].loc[:,'request'].values for i in range(n_splits)]
-train_classes = [train_data[i].loc[:,intents].values for i in range(n_splits)]
-test_requests = [test_data[i].loc[:, 'request'].values for i in range(n_splits)]
+train_requests = [train_data[i].loc[:,'sentence'].values for i in range(n_splits)]
+train_classes = [train_data[i].loc[:, intents].values for i in range(n_splits)]
+test_requests = [test_data[i].loc[:, 'sentence'].values for i in range(n_splits)]
 test_classes = [test_data[i].loc[:, intents].values for i in range(n_splits)]
 
 if FIND_BEST_PARAMS:
     print("___TO FIND APPROPRIATE PARAMETERS____")
 
-    FindBestRecognizer = IntentRecognizer(intents, fasttext_embedding_model = fasttext_model, n_splits = n_splits)
+    FindBestRecognizer = IntentRecognizer(intents, fasttext_embedding_model=fasttext_model, n_splits=n_splits)
 
     best_mean_f1 = 0.
     best_network_params = dict()
@@ -73,16 +71,17 @@ if FIND_BEST_PARAMS:
     params_f1 = []
 
     for p in range(100):
-        FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
-                                                    coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
-                                                    filters_cnn={'range': [200,300], 'discrete': True},
-                                                    dense_size={'range': [50,100], 'discrete': True},
+        FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.001,0.1], 'scale': 'log'},
+                                                    coef_reg_den={'range': [0.001,0.1], 'scale': 'log'},
+                                                    filters_cnn={'range': [100,300], 'discrete': True},
+                                                    dense_size={'range': [50,150], 'discrete': True},
                                                     dropout_rate={'range': [0.4,0.6]})
         FindBestRecognizer.gener_learning_parameters(batch_size={'range': [16,64], 'discrete': True},
                                                      lear_rate={'range': [0.01,0.1], 'scale': 'log'},
                                                      lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
-                                                     epochs={'range': [20,50], 'discrete': True, 'scale': 'log'})
-        FindBestRecognizer.init_model(cnn_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
+                                                     epochs={'range': [100,500], 'discrete': True, 'scale': 'log'})
+        FindBestRecognizer.init_model(cnn_word_model_sigmoid, text_size, embedding_size, kernel_sizes,
+                                      add_network_params=None)
 
         FindBestRecognizer.fit_model(train_requests, train_classes, verbose=True, to_use_kfold=False)
 
@@ -93,10 +92,9 @@ if FIND_BEST_PARAMS:
 
         test_predictions = FindBestRecognizer.predict(test_requests)
 
-
-        f1_test = FindBestRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
+        f1_test, f1_macro, f1_weighted = FindBestRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                             np.vstack([test_predictions[i] for i in range(n_splits)]),
-                                            mode='TEST')[0]
+                                            mode='TEST')
         mean_f1 = np.mean(f1_test)
 
         params_dict = FindBestRecognizer.all_params_to_dict()
@@ -105,10 +103,10 @@ if FIND_BEST_PARAMS:
         params_f1.append(params_dict)
 
         params_f1_dataframe = pd.DataFrame(params_f1)
-        params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '.txt')
+        params_f1_dataframe.to_csv("/home/dilyara/data/outputs/fact_opinion/depend_" + VERSION + '.txt')
 
         if mean_f1 > best_mean_f1:
-            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION)
+            FindBestRecognizer.save_models(fname='/home/dilyara/data/models/fact_opinion/best_model_' + VERSION)
             print('___BETTER PARAMETERS FOUND!___\n')
             print('___THESE PARAMETERS ARE:___', params_dict)
             best_mean_f1 = mean_f1
@@ -121,6 +119,11 @@ if AVERAGE_FOR_PARAMS:
 
     for p in range(NUM_OF_CALCS):
         # for cnn model
+        # {'coef_reg_cnn_0': 0.0033318201134740549, 'coef_reg_den_0': 0.0054373095552282986, 'filters_cnn_0': 256,
+        #  'dense_size_0': 207, 'dropout_rate_0': 0.5406982976365785, 'batch_size_0': 63,
+        #  'lear_rate_0': 0.062165154413520614, 'lear_rate_decay_0': 0.080905421964017704, 'epochs_0': 477,
+        #  'mean_f1': 0.64817978951014055} __
+
         AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.00036855026787845302,
                                                     'coef_reg_den': 0.00029720938577019042,
                                                     'filters_cnn': 250,
@@ -145,35 +148,6 @@ if AVERAGE_FOR_PARAMS:
                                                      'lear_rate_decay': 0.037668912128691327,
                                                      'epochs': 45}])
 
-        # for lstm model
-        # AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.004690316263478835,
-        #                                             'coef_reg_den': 0.00016111260276509366,
-        #                                             'filters_cnn': 283,
-        #                                             'dense_size': 81,
-        #                                             'dropout_rate': 0.4646244872675152},
-        #                                            {'coef_reg_cnn': 0.0019815155300732133,
-        #                                             'coef_reg_den': 0.0011118454048493782,
-        #                                             'filters_cnn': 217,
-        #                                             'dense_size': 100,
-        #                                             'dropout_rate': 0.5033032073608426},
-        #                                            {'coef_reg_cnn': 0.0021683825957939935,
-        #                                             'coef_reg_den': 0.0016402686797785651,
-        #                                             'filters_cnn': 223,
-        #                                             'dense_size': 72,
-        #                                             'dropout_rate': 0.5916168228181803}])
-        # AverageRecognizer.init_learning_parameters([{'batch_size': 48,
-        #                                              'lear_rate': 0.020044162550942473,
-        #                                              'lear_rate_decay': 0.011366401170819898,
-        #                                              'epochs': 28},
-        #                                             {'batch_size': 50,
-        #                                              'lear_rate': 0.016578541239442787,
-        #                                              'lear_rate_decay': 0.030408401174317149,
-        #                                              'epochs': 26},
-        #                                             {'batch_size': 58,
-        #                                              'lear_rate': 0.011329814924816623,
-        #                                              'lear_rate_decay': 0.014844377557905427,
-        #                                              'epochs': 29}])
-
         AverageRecognizer.init_model(lstm_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
 
         AverageRecognizer.fit_model(train_requests, train_classes, to_use_kfold=False, verbose=True)
@@ -187,7 +161,7 @@ if AVERAGE_FOR_PARAMS:
 
         f1_test = AverageRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                            np.vstack([test_predictions[i] for i in range(n_splits)]),
-                                           mode='TEST')[0]
+                                           mode='TEST')
         f1_scores_for_intents.append(f1_test)
     f1_scores_for_intents = np.asarray(f1_scores_for_intents)
     for intent_id in range(len(intents)):
