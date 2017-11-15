@@ -67,11 +67,11 @@ kernel_sizes=[1,2,3]
 intents = np.unique(train_data[0]['intent_id'].values)
 intents = [str(intent_id) for intent_id in intents]
 print('Considered Intents: ', intents)
-
-class_weight = [compute_class_weight('balanced',
-                                     np.unique(train_data[0]['intent_id'].values),
-                                     train_data[0].loc[:, 'intent_id'].values.astype(int))]
-# class_weight = None
+#
+# class_weight = [compute_class_weight('balanced',
+#                                      np.unique(train_data[0]['intent_id'].values),
+#                                      train_data[0].loc[:, 'intent_id'].values.astype(int))]
+class_weight = None
 
 # BALANCING TRAIN DATASET
 #
@@ -164,13 +164,13 @@ if FIND_BEST_PARAMS:
     for p in range(100):
         FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.001,0.01], 'scale': 'log'},
                                                     coef_reg_den={'range': [0.001,0.01], 'scale': 'log'},
-                                                    filters_cnn={'range': [10,200], 'discrete': True},
+                                                    filters_cnn={'range': [10,100], 'discrete': True},
                                                     dense_size={'range': [300,500], 'discrete': True},
                                                     dropout_rate={'range': [0.4,0.6]})
         FindBestRecognizer.gener_learning_parameters(batch_size={'range': [16,64], 'discrete': True},
                                                      lear_rate={'range': [0.01,0.1], 'scale': 'log'},
                                                      lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
-                                                     epochs={'range': [10,100], 'discrete': True, 'scale': 'log'})
+                                                     epochs={'range': [100,500], 'discrete': True, 'scale': 'log'})
         FindBestRecognizer.init_model(cnn_char_model, text_size, embedding_size, kernel_sizes,
                                       add_network_params={'vocabulary_size': vocabulary_size})
 
