@@ -65,6 +65,7 @@ class IntentRecognizer(object):
         self.models = None
         self.model_function = None
         self.histories = None
+        self.fasttext_embedding_model = None
 
         if fasttext_embedding_model is not None:
             print("___Fasttext embedding model is loaded___")
@@ -125,8 +126,11 @@ class IntentRecognizer(object):
                                                      **(self.network_parameters[model_ind])))
         return True
 
-    def fit_model(self, data, classes, to_use_kfold=False, verbose=True, add_inputs=None):
+    def fit_model(self, data, classes, to_use_kfold=False, verbose=True,
+                  add_inputs=None, class_weight=None, shuffle=False):
         print("___Fitting model___")
+        if class_weight is None:
+            class_weight = [None for i in range(self.n_splits)]
 
         if to_use_kfold == True:
             print("___Stratified splitting data___")
@@ -158,7 +162,8 @@ class IntentRecognizer(object):
         for model_ind in range(self.n_splits):
             if self.fasttext_embedding_model is not None:
                 X_train_embed = text2embeddings(self.X_train[model_ind], self.fasttext_embedding_model, self.text_size, self.embedding_size)
-
+            else:
+                X_train_embed = self.X_train[model_ind]
             optimizer = Adam(lr=self.learning_parameters[model_ind]['lear_rate'], 
                              decay=self.learning_parameters[model_ind]['lear_rate_decay'])
             self.models[model_ind].compile(loss='categorical_crossentropy',
@@ -173,7 +178,8 @@ class IntentRecognizer(object):
                                                                  epochs=self.learning_parameters[model_ind]['epochs'],
                                                                  validation_split=0.1,
                                                                  verbose=2 * verbose,
-                                                                 shuffle = False,
+                                                                 shuffle=shuffle,
+                                                                 class_weight=class_weight[model_ind],
                                                                  callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
             else:
                 self.histories.append(self.models[model_ind].fit(X_train_embed[permut],
@@ -182,7 +188,8 @@ class IntentRecognizer(object):
                                                                  epochs=self.learning_parameters[model_ind]['epochs'],
                                                                  validation_split=0.1,
                                                                  verbose=2 * verbose,
-                                                                 shuffle=False,
+                                                                 shuffle=shuffle,
+                                                                 class_weight=class_weight[model_ind],
                                                                  callbacks=[
                                                                      EarlyStopping(monitor='val_loss', min_delta=0.0)]))
 
@@ -204,7 +211,13 @@ class IntentRecognizer(object):
                     predictions.append(self.models[model_ind].predict(X_test_embed).reshape(-1, self.n_classes))
             return predictions
         else:
-            return False
+            for model_ind in range(self.n_splits):
+                X_test_embed = X_test[model_ind]
+                if add_inputs is not None:
+                    predictions.append(self.models[model_ind].predict([X_test_embed, add_inputs[model_ind]]).reshape(-1, self.n_classes))
+                else:
+                    predictions.append(self.models[model_ind].predict(X_test_embed).reshape(-1, self.n_classes))
+            return predictions
 
     def report(self, true, predicts, mode=None):
         print("___Report___")

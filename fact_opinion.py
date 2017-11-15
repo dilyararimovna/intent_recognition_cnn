@@ -19,6 +19,7 @@ import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
 from random_search_class import param_gen
 from save_load_model import init_from_scratch, init_from_saved, save
+from fasttext_embeddings import text2embeddings
 from save_predictions import save_predictions
 
 SEED = 23
@@ -26,9 +27,9 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 
-FIND_BEST_PARAMS = True
-AVERAGE_FOR_PARAMS = False
-NUM_OF_CALCS = 16
+FIND_BEST_PARAMS = False
+AVERAGE_FOR_PARAMS = True
+NUM_OF_CALCS = 1
 VERSION = '_cnn_word_1'
 
 train_data = []
@@ -118,37 +119,18 @@ if AVERAGE_FOR_PARAMS:
     f1_scores_for_intents = []
 
     for p in range(NUM_OF_CALCS):
-        # for cnn model
-        # {'coef_reg_cnn_0': 0.0033318201134740549, 'coef_reg_den_0': 0.0054373095552282986, 'filters_cnn_0': 256,
-        #  'dense_size_0': 207, 'dropout_rate_0': 0.5406982976365785, 'batch_size_0': 63,
-        #  'lear_rate_0': 0.062165154413520614, 'lear_rate_decay_0': 0.080905421964017704, 'epochs_0': 477,
-        #  'mean_f1': 0.64817978951014055} __
+        AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.0031654815682148874,
+                                                    'coef_reg_den': 0.0092195561612545517,
+                                                    'filters_cnn': 256,
+                                                    'dense_size': 144,
+                                                    'dropout_rate': 0.47129140290180205}])
+        AverageRecognizer.init_learning_parameters([{'batch_size': 40,
+                                                     'lear_rate': 0.042842998743792313,
+                                                     'lear_rate_decay': 0.094851995579758624,
+                                                     'epochs': 101}])
 
-        AverageRecognizer.init_network_parameters([{'coef_reg_cnn': 0.00036855026787845302,
-                                                    'coef_reg_den': 0.00029720938577019042,
-                                                    'filters_cnn': 250,
-                                                    'dense_size': 60, 'dropout_rate': 0.4428009151691538},
-                                                   {'coef_reg_cnn': 0.00021961271422818286,
-                                                    'coef_reg_den': 0.00038807312004670983,
-                                                    'filters_cnn': 213,
-                                                    'dense_size': 73, 'dropout_rate': 0.4163792890042266},
-                                                   {'coef_reg_cnn': 0.0032453791711150072,
-                                                    'coef_reg_den': 0.002292512102049529,
-                                                    'filters_cnn': 263,
-                                                    'dense_size': 56, 'dropout_rate': 0.480199139584279}])
-        AverageRecognizer.init_learning_parameters([{'batch_size': 60,
-                                                     'lear_rate': 0.0200569566892299,
-                                                     'lear_rate_decay': 0.046826433619590428,
-                                                     'epochs': 25},
-                                                    {'batch_size': 18,
-                                                     'lear_rate': 0.047765133582360196,
-                                                     'lear_rate_decay': 0.08370914599522486, 'epochs': 38},
-                                                    {'batch_size': 21,
-                                                     'lear_rate': 0.016858859621336184,
-                                                     'lear_rate_decay': 0.037668912128691327,
-                                                     'epochs': 45}])
-
-        AverageRecognizer.init_model(lstm_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
+        AverageRecognizer.init_model(cnn_word_model_sigmoid, text_size, embedding_size, kernel_sizes,
+                                     add_network_params=None)
 
         AverageRecognizer.fit_model(train_requests, train_classes, to_use_kfold=False, verbose=True)
 
@@ -161,9 +143,14 @@ if AVERAGE_FOR_PARAMS:
 
         f1_test = AverageRecognizer.report(np.vstack([test_classes[i] for i in range(n_splits)]),
                                            np.vstack([test_predictions[i] for i in range(n_splits)]),
-                                           mode='TEST')
+                                           mode='TEST')[0]
         f1_scores_for_intents.append(f1_test)
+        save_predictions(test_data[0], test_predictions[0].reshape(-1,3),
+                         columns_for_predictions=[intent + '_pred' for intent in intents],
+                         filename='/home/dilyara/data/outputs/fact_opinion/test_predicts.csv')
+
     f1_scores_for_intents = np.asarray(f1_scores_for_intents)
+
     for intent_id in range(len(intents)):
         f1_mean = np.mean(f1_scores_for_intents[:,intent_id])
         f1_std = np.std(f1_scores_for_intents[:,intent_id])

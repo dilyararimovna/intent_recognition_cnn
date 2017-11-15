@@ -11,7 +11,7 @@ import numpy as np
 import fasttext
 
 from metrics import fmeasure
-from intent_models import cnn_word_model,cnn_word_model_ner, lstm_word_model
+from intent_models import cnn_word_model, cnn_word_model_ner, lstm_word_model,cnn_char_model
 from intent_recognizer_class import IntentRecognizer
 
 import sys
@@ -20,7 +20,9 @@ from random_search_class import param_gen
 from save_load_model import init_from_scratch, init_from_saved, save
 from save_predictions import save_predictions
 from balance_dataset import balance_multiclass_dataset
+from keras.preprocessing.sequence import pad_sequences
 
+from sklearn.utils.class_weight import compute_class_weight
 
 SEED = 23
 np.random.seed(SEED)
@@ -39,6 +41,7 @@ train_data.append(pd.read_csv("/home/dilyara/data/data_files/sber_rafael/train_d
 
 train_data[0].drop('id',axis=1, inplace=True)
 train_data[0] = train_data[0].dropna(axis=0, how='any')
+train_data[0].set_index(np.arange(train_data[0].shape[0]), inplace=True)
 
 test_data = []
 
@@ -47,7 +50,7 @@ test_data.append(pd.read_csv("/home/dilyara/data/data_files/sber_rafael/test_ds.
 
 test_data[0].drop('id', axis=1, inplace=True)
 test_data[0] = test_data[0].dropna(axis=0, how='any')
-
+test_data[0].set_index(np.arange(test_data[0].shape[0]), inplace=True)
 
 fasttext_model_file = '/home/dilyara/data/data_files/embeddings/fasttext_model_sber.bin'
 fasttext_model = fasttext.load_model(fasttext_model_file)
@@ -65,6 +68,11 @@ intents = np.unique(train_data[0]['intent_id'].values)
 intents = [str(intent_id) for intent_id in intents]
 print('Considered Intents: ', intents)
 
+class_weight = [compute_class_weight('balanced',
+                                     np.unique(train_data[0]['intent_id'].values),
+                                     train_data[0].loc[:, 'intent_id'].values.astype(int))]
+# class_weight = None
+
 # BALANCING TRAIN DATASET
 #
 # balanced_requests, balanced_labels = balance_multiclass_dataset(train_data[0].loc[:,'request'],
@@ -77,7 +85,6 @@ print('Considered Intents: ', intents)
 #                                    columns=['request', 'intent_id'])
 # train_data[0] = balanced_train_data.copy()
 # print(train_data[0].shape)
-#
 # del balanced_train_data
 
 one_hot_table = np.eye(len(intents))
@@ -91,18 +98,63 @@ for i in range(n_splits):
         test_data[i][intent] = one_hot_table[test_data[i].loc[:, 'intent_id'].values.astype(int), intent_id]
     print(test_data[i].head())
 
-train_requests = [train_data[i].loc[:,'request'].values for i in range(n_splits)]
-train_classes = [train_data[i].loc[:, intents].values for i in range(n_splits)]
-test_requests = [test_data[i].loc[:, 'request'].values for i in range(n_splits)]
-test_classes = [test_data[i].loc[:, intents].values for i in range(n_splits)]
 
-num_samples_per_class = [[np.sum(train_data[i].loc[:, intent].values) for intent in intents] for i in range(n_splits)]
-class_weight = [[1. / num_samples_per_class[i][j] for j in range(len(intents))] for i in range(n_splits)]
+
+# train_requests = [train_data[i].loc[:,'request'].values for i in range(n_splits)]
+# train_classes = [train_data[i].loc[:, intents].values for i in range(n_splits)]
+# test_requests = [test_data[i].loc[:, 'request'].values for i in range(n_splits)]
+# test_classes = [test_data[i].loc[:, intents].values for i in range(n_splits)]
+
+# num_samples_per_class = [[np.sum(train_data[i].loc[:, intent].values) for intent in intents] for i in range(n_splits)]
+# class_weight = [[1. / num_samples_per_class[i][j] for j in range(len(intents))] for i in range(n_splits)]
+
+
+#---------------------------------------CHAR MODEL------------------------------
+rus_alphabet = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'
+eng_alphabet = ''#'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+digits = '0123456789'
+punctuation = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+white_space = ' '
+
+alphabet = white_space + rus_alphabet + eng_alphabet + digits + punctuation
+
+text_size = 500
+kernel_sizes = [3, 5, 7]
+vocabulary_size = len(alphabet)
+
+def char2id(char):
+    if char in alphabet:
+        return alphabet.find(char)
+    else:
+        return 0 # UNK will be a white space
+
+def id2char(id_):
+    return alphabet[id_]
+
+def text2vec(text):
+    res = np.asarray([char2id(char) for char in text])
+    return res
+
+train_comm_seq = []
+test_comm_seq = []
+
+for i in range(train_data[0].shape[0]):
+    train_comm_seq.append(text2vec(train_data[0].loc[i,'request']))
+
+for i in range(test_data[0].shape[0]):
+    test_comm_seq.append(text2vec(test_data[0].loc[i,'request']))
+
+train_requests = [pad_sequences(train_comm_seq, maxlen=text_size, dtype='int32',
+                                padding='pre', truncating='pre', value=0)]
+test_requests = [pad_sequences(test_comm_seq, maxlen=text_size, dtype='int32',
+                               padding='pre', truncating='pre', value=0)]
+train_classes, test_classes = [train_data[0].loc[:,intents].values], [test_data[0].loc[:,intents].values]
+
 
 if FIND_BEST_PARAMS:
     print("___TO FIND APPROPRIATE PARAMETERS____")
 
-    FindBestRecognizer = IntentRecognizer(intents, fasttext_embedding_model=fasttext_model, n_splits=n_splits)
+    FindBestRecognizer = IntentRecognizer(intents, n_splits=n_splits)
 
     best_mean_f1 = 0.
     best_network_params = dict()
@@ -110,19 +162,22 @@ if FIND_BEST_PARAMS:
     params_f1 = []
 
     for p in range(100):
-        FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.1], 'scale': 'log'},
-                                                    coef_reg_den={'range': [0.0001,0.1], 'scale': 'log'},
-                                                    filters_cnn={'range': [10,50], 'discrete': True},
-                                                    dense_size={'range': [100,200], 'discrete': True},
+        FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.001,0.01], 'scale': 'log'},
+                                                    coef_reg_den={'range': [0.001,0.01], 'scale': 'log'},
+                                                    filters_cnn={'range': [10,200], 'discrete': True},
+                                                    dense_size={'range': [300,500], 'discrete': True},
                                                     dropout_rate={'range': [0.4,0.6]})
-        FindBestRecognizer.gener_learning_parameters(batch_size={'range': [8,32], 'discrete': True},
+        FindBestRecognizer.gener_learning_parameters(batch_size={'range': [16,64], 'discrete': True},
                                                      lear_rate={'range': [0.01,0.1], 'scale': 'log'},
                                                      lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
                                                      epochs={'range': [10,100], 'discrete': True, 'scale': 'log'})
-        FindBestRecognizer.init_model(cnn_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
+        FindBestRecognizer.init_model(cnn_char_model, text_size, embedding_size, kernel_sizes,
+                                      add_network_params={'vocabulary_size': vocabulary_size})
 
         FindBestRecognizer.fit_model(train_requests, train_classes, verbose=True, to_use_kfold=False,
-                                     shuffle=True, class_weight=class_weight)
+                                     shuffle=True,
+                                     class_weight=class_weight
+                                     )
 
         train_predictions = FindBestRecognizer.predict(train_requests)
         FindBestRecognizer.report(np.vstack([train_classes[i] for i in range(n_splits)]),
