@@ -67,9 +67,9 @@ intents = [str(intent_id) for intent_id in intents]
 print('Considered Intents: ', intents)
 class_weight = None
 
-# class_weight = [compute_class_weight('balanced',
-#                                      np.unique(train_data[0]['intent_id'].values),
-#                                      train_data[0].loc[:, 'intent_id'].values.astype(int))]
+class_weight = [compute_class_weight('balanced',
+                                     np.unique(train_data[0]['intent_id'].values),
+                                     train_data[0].loc[:, 'intent_id'].values.astype(int))]
 
 
 # BALANCING TRAIN DATASET
