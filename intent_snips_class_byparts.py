@@ -14,29 +14,31 @@ from metrics import fmeasure
 from intent_models import cnn_word_model,cnn_word_model_ner
 from intent_recognizer_class import IntentRecognizer
 
-import sys
+import sys, os
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
 from random_search_class import param_gen
 from save_load_model import init_from_scratch, init_from_saved, save
 from save_predictions import save_predictions
 
-SEED = 23
+SEED = 42
 np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 
 FIND_BEST_PARAMS = True
 AVERAGE_FOR_PARAMS = False
-NUM_OF_CALCS = 2
-VERSION = '_softmax_findbest_byparts_0'
+NUM_OF_CALCS = 16
+VERSION = '_findbest_byparts_paraphrases_2_nobpe'
+
+path = '/home/dilyara/data/data_files/snips'
 
 train_data = []
 
-train_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_train_0"))
+train_data.append(pd.read_csv(os.path.join(path, 'paraphrases/intent_train_data_with_paraphrases.csv')))
 
 test_data = []
 
-test_data.append(pd.read_csv("/home/dilyara/data/data_files/snips/snips_ner_gold/snips_ner_gold_0/snips_test_0"))
+test_data.append(pd.read_csv(os.path.join(path, 'paraphrases/intent_test_data_with_paraphrases.csv')))
 
 fasttext_model_file = '/home/dilyara/data/data_files/embeddings/reddit_fasttext_model.bin'
 fasttext_model = fasttext.load_model(fasttext_model_file)
@@ -46,8 +48,8 @@ text_size = 25
 embedding_size = 100
 n_splits = 1
 kernel_sizes=[1,2,3]
-#train_sizes = [10, 25, 50, 100, 200, 500, 1000] # per intent
-train_sizes = [10, 25, 50, 100, 200] # per intent
+train_sizes = [1000] # per intent
+# train_sizes = [10, 25, 50] # per intent
 
 
 intents = ['AddToPlaylist', 'BookRestaurant', 'GetWeather',
@@ -57,8 +59,8 @@ intents = ['AddToPlaylist', 'BookRestaurant', 'GetWeather',
 
 train_requests = [train_data[i].loc[:,'request'].values for i in range(n_splits)]
 train_classes = [train_data[i].loc[:,intents].values for i in range(n_splits)]
-test_requests = [test_data[i].loc[:, 'request'].values for i in range(n_splits)]
-test_classes = [test_data[i].loc[:, intents].values for i in range(n_splits)]
+test_requests = [test_data[i].loc[:2761, 'request'].values for i in range(n_splits)]
+test_classes = [test_data[i].loc[:2761, intents].values for i in range(n_splits)]
 
 for train_size in train_sizes:
     print("\n\n______NUMBER OF TRAIN SAMPLES PER INTENT = %d___________" % train_size)
@@ -86,13 +88,13 @@ for train_size in train_sizes:
         for p in range(20):
             FindBestRecognizer.gener_network_parameters(coef_reg_cnn={'range': [0.0001,0.01], 'scale': 'log'},
                                                         coef_reg_den={'range': [0.0001,0.01], 'scale': 'log'},
-                                                        filters_cnn={'range': [200,300], 'discrete': True},
-                                                        dense_size={'range': [50,100], 'discrete': True},
+                                                        filters_cnn={'range': [50,200], 'discrete': True},
+                                                        dense_size={'range': [50,200], 'discrete': True},
                                                         dropout_rate={'range': [0.4,0.6]})
             FindBestRecognizer.gener_learning_parameters(batch_size={'range': [16,64], 'discrete': True},
                                                          lear_rate={'range': [0.01,0.1], 'scale': 'log'},
                                                          lear_rate_decay={'range': [0.01,0.1], 'scale': 'log'},
-                                                         epochs={'range': [20,50], 'discrete': True, 'scale': 'log'})
+                                                         epochs={'range': [50,100], 'discrete': True, 'scale': 'log'})
             FindBestRecognizer.init_model(cnn_word_model, text_size, embedding_size, kernel_sizes, add_network_params=None)
 
             FindBestRecognizer.fit_model(train_requests_part, train_classes_part, verbose=True, to_use_kfold=False)
@@ -114,10 +116,12 @@ for train_size in train_sizes:
             params_dict['mean_f1'] = mean_f1
             params_f1.append(params_dict)
             params_f1_dataframe = pd.DataFrame(params_f1)
-            params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" + VERSION + '_' + str(train_size) + '.txt')
+            params_f1_dataframe.to_csv("/home/dilyara/data/outputs/intent_snips/depend_" +
+                                       VERSION + '_' + str(train_size) + '.txt')
 
             if mean_f1 > best_mean_f1:
-                FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' + VERSION + '_' + str(train_size))
+                FindBestRecognizer.save_models(fname='/home/dilyara/data/models/intent_models/snips_models_softmax/best_model_' +
+                                                     VERSION + '_' + str(train_size))
                 print('___BETTER PARAMETERS FOUND!___\n')
                 print('___THESE PARAMETERS ARE:___', params_dict)
                 best_mean_f1 = mean_f1

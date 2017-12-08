@@ -1,37 +1,22 @@
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-
 config = tf.ConfigProto()
-# config.gpu_options.per_process_gpu_memory_fraction = 0.95
 config.gpu_options.allow_growth = True
 config.gpu_options.visible_device_list = '0'
 set_session(tf.Session(config=config))
 
-import pandas as pd
 import numpy as np
-
 import sklearn.model_selection
-
-import keras
-from keras.optimizers import Adam, SGD
-from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
-import json
-from keras import backend as K
-import fasttext
+from keras.optimizers import Adam
+from keras.callbacks import  EarlyStopping
 
 from metrics import fmeasure
-
-from intent_models import cnn_word_model, cnn_word_model_ner, cnn_word_model_with_sent_emb,cnn_word_model_ner_2
-from report_intent import report
 from sklearn.metrics import precision_recall_fscore_support, f1_score
-
 import sys
 sys.path.append('/home/dilyara/Documents/GitHub/general_scripts')
 from random_search_class import param_gen
 from save_load_model import init_from_scratch, init_from_saved, save
 from fasttext_embeddings import text2embeddings
-from save_predictions import save_predictions
-
 
 def one_hot2ids(one_hot_labels):
     return np.argmax(one_hot_labels, axis=1)
@@ -127,7 +112,8 @@ class IntentRecognizer(object):
         return True
 
     def fit_model(self, data, classes, to_use_kfold=False, verbose=True,
-                  add_inputs=None, class_weight=None, shuffle=False):
+                  add_inputs=None, class_weight=None, shuffle=False,
+                  loss='categorical_crossentropy', patience=0):
         print("___Fitting model___")
         if class_weight is None:
             class_weight = [None for i in range(self.n_splits)]
@@ -166,10 +152,9 @@ class IntentRecognizer(object):
                 X_train_embed = self.X_train[model_ind]
             optimizer = Adam(lr=self.learning_parameters[model_ind]['lear_rate'], 
                              decay=self.learning_parameters[model_ind]['lear_rate_decay'])
-            self.models[model_ind].compile(loss='categorical_crossentropy',
+            self.models[model_ind].compile(loss=loss,
                                            optimizer=optimizer,
-                                           metrics=['categorical_accuracy',
-                                           fmeasure])
+                                           metrics=['categorical_accuracy', fmeasure])
             permut = np.random.permutation(np.arange(X_train_embed.shape[0]))
             if add_inputs is not None:
                 self.histories.append(self.models[model_ind].fit([X_train_embed[permut], add_inputs[model_ind][permut]],
@@ -180,7 +165,9 @@ class IntentRecognizer(object):
                                                                  verbose=2 * verbose,
                                                                  shuffle=shuffle,
                                                                  class_weight=class_weight[model_ind],
-                                                                 callbacks=[EarlyStopping(monitor='val_loss', min_delta=0.0)]))
+                                                                 callbacks=[EarlyStopping(monitor='val_loss',
+                                                                                          min_delta=0.0,
+                                                                                          patience=patience)]))
             else:
                 self.histories.append(self.models[model_ind].fit(X_train_embed[permut],
                                                                  self.y_train[model_ind][permut].reshape(-1,self.n_classes),
@@ -191,7 +178,9 @@ class IntentRecognizer(object):
                                                                  shuffle=shuffle,
                                                                  class_weight=class_weight[model_ind],
                                                                  callbacks=[
-                                                                     EarlyStopping(monitor='val_loss', min_delta=0.0)]))
+                                                                     EarlyStopping(monitor='val_loss',
+                                                                                   min_delta=0.0,
+                                                                                   patience=patience)]))
 
         return True
 
@@ -265,7 +254,16 @@ class IntentRecognizer(object):
             list_of_tag_tables.append(tag_table)
         return list_of_tag_tables
 
+    def load_model(self, fname, loss='categorical_crossentropy'):
+        for model_ind in range(self.n_splits):
+            optimizer = Adam(lr=self.learning_parameters[model_ind]['lear_rate'],
+                             decay=self.learning_parameters[model_ind]['lear_rate_decay'])
+            self.models[model_ind].compile(loss=loss,
+                                           optimizer=optimizer,
+                                           metrics=['categorical_accuracy', fmeasure])
 
+            self.models[model_ind].load_weights(fname + '_' + str(model_ind) + '.h5')
+        return True
 
 
 
