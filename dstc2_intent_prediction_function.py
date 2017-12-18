@@ -5,8 +5,8 @@ config.gpu_options.allow_growth = True
 config.gpu_options.visible_device_list = '0'
 set_session(tf.Session(config=config))
 import fasttext
-from intent_models import cnn_word_model
-from intent_recognizer_class import IntentRecognizer
+from .intent_models import cnn_word_model
+from .intent_recognizer_class import IntentRecognizer
 import os
 import numpy as np
 import re
